@@ -319,6 +319,7 @@
           <div class="overview-meta">
             <div class="earned-label">{{ credential.earned_label }}</div>
             {% if credential.annual_label %}<div class="annual-label">{{ credential.annual_label }}</div>{% endif %}
+            {% if credential.cascade_note %}<div class="note-callout cascade-warning">⚠ {{ credential.cascade_note }}</div>{% endif %}
             {% if credential.note %}<div class="note-callout">⚠ {{ credential.note }}</div>{% endif %}
           </div>
         </div>

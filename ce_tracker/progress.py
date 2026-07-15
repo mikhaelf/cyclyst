@@ -1,7 +1,8 @@
 """Computes credential progress (status, pct earned, days left, category pass/fail) from
 stored cycle dates and activity data — nothing here is persisted, it's recomputed on every
-view. Implements design doc §4 for the 'cpe_hours' and 'exam' renewal types; 'mandatory_module'
-and the renews/depends_on cascade are schema-only for now (see plan/CLAUDE.md scope note).
+view. Implements design doc §4 for the 'cpe_hours' and 'exam' renewal types, plus the
+depends_on cascade (branch 4); 'mandatory_module' and the 'renews' stacking relationship
+are still schema-only.
 """
 
 from datetime import date
@@ -105,3 +106,29 @@ def compute_progress(credential_row, activities, categories, today=None):
         "status": status, "pct": pct, "earned": earned, "days_left": days_left,
         "on_track": on_track, "annual_earned": annual_earned, "category_results": category_results,
     }
+
+
+def apply_dependency_cascade(credential_row, status, status_by_id):
+    """Design doc §4 branch 4: a credential can be individually on track but still be
+    invalid because a prerequisite lapsed. `status_by_id` is every OTHER credential's own
+    intrinsic status (id -> status), computed independently — this only ever escalates
+    `status` to 'at-risk', never de-escalates it, and never itself produces 'expired'
+    (matching the design doc, which treats cascade failure as a warning, not an outage).
+
+    depends_on: single credential id that must not be 'expired' (AND).
+    depends_on_any_of: comma-separated credential ids where at least one must not be
+    'expired' (OR) — for compound cases like IAPP's FIP (requires CIPP + one of CIPM/CIPT/AIGP)
+    that a single depends_on can't express.
+
+    Returns (final_status, cascade_note_or_None).
+    """
+    depends_on = credential_row["depends_on"]
+    if depends_on and status_by_id.get(depends_on) == "expired":
+        return "at-risk", f"Prerequisite credential '{depends_on}' has expired."
+
+    any_of_raw = credential_row["depends_on_any_of"] if "depends_on_any_of" in credential_row.keys() else None
+    any_of = [c.strip() for c in any_of_raw.split(",") if c.strip()] if any_of_raw else []
+    if any_of and all(status_by_id.get(c) == "expired" for c in any_of):
+        return "at-risk", "None of the qualifying alternate credentials (" + ", ".join(any_of) + ") are currently active."
+
+    return status, None

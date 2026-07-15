@@ -79,12 +79,25 @@ def _days_label(status, days_left):
     return f"{days_left} days left"
 
 
+def _status_by_id(conn):
+    """Every non-archived credential's own intrinsic (pre-cascade) status, keyed by id —
+    lets progress.apply_dependency_cascade check a credential's prerequisites without
+    those prerequisites needing to be independently re-derived by the caller."""
+    rows = conn.execute("SELECT * FROM credentials WHERE archived = 0").fetchall()
+    statuses = {}
+    for row in rows:
+        categories = _fetch_categories(conn, row["id"])
+        activities = _fetch_applicable_activities(conn, row["id"])
+        statuses[row["id"]] = progress.compute_progress(row, activities, categories)["status"]
+    return statuses
+
+
 def credential_view(row, conn):
     categories = _fetch_categories(conn, row["id"])
     activities = _fetch_applicable_activities(conn, row["id"])
     prog = progress.compute_progress(row, activities, categories)
 
-    status = prog["status"]
+    status, cascade_note = progress.apply_dependency_cascade(row, prog["status"], _status_by_id(conn))
     status_color = STATUS_COLOR[status]
     pct = prog["pct"]
     pct_label = "—" if pct is None else f"{pct}%"
@@ -108,6 +121,7 @@ def credential_view(row, conn):
         "earned_label": earned_label,
         "annual_label": annual_label,
         "note": row["note"],
+        "cascade_note": cascade_note,
         "status": status,
         "status_color": status_color,
         "status_label": STATUS_LABEL[status],
@@ -130,11 +144,13 @@ def sidebar_credentials(conn):
     rows = conn.execute(
         "SELECT * FROM credentials WHERE archived = 0 ORDER BY rowid"
     ).fetchall()
+    status_by_id = _status_by_id(conn)
     result = []
     for row in rows:
         categories = _fetch_categories(conn, row["id"])
         activities = _fetch_applicable_activities(conn, row["id"])
         prog = progress.compute_progress(row, activities, categories)
+        status, _ = progress.apply_dependency_cascade(row, prog["status"], status_by_id)
         pct = prog["pct"]
         result.append(
             {
@@ -143,7 +159,7 @@ def sidebar_credentials(conn):
                 "issuer": row["issuer"],
                 "pct": pct,
                 "pct_label": "—" if pct is None else f"{pct}%",
-                "status_color": STATUS_COLOR[prog["status"]],
+                "status_color": STATUS_COLOR[status],
                 "bar_width": pct or 0,
             }
         )

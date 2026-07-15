@@ -162,12 +162,25 @@ def _migrate_member_id_column(conn):
         )
 
 
+def _migrate_dependency_any_of_column(conn):
+    """`depends_on` (existing, design doc §3/§9) expresses a single hard AND-dependency —
+    Salesforce-style: this credential is invalid if that one lapses. Some real credentials
+    (e.g. IAPP's Fellow of Information Privacy) need a second, OR-shaped dependency: valid
+    as long as *at least one* of a group stays active. `depends_on_any_of` adds that without
+    changing the meaning of the existing column."""
+    existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(credentials)")}
+    if "depends_on_any_of" in existing_cols:
+        return
+    conn.execute("ALTER TABLE credentials ADD COLUMN depends_on_any_of TEXT")  # comma-separated credential ids
+
+
 def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = get_db()
     conn.executescript(SCHEMA)
     _migrate_credential_columns(conn)
     _migrate_member_id_column(conn)
+    _migrate_dependency_any_of_column(conn)
     conn.commit()
     conn.close()
 
