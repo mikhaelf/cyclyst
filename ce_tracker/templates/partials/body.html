@@ -149,6 +149,11 @@
           </div>
           {% if credential_form_errors.get('annual_minimum') %}<div class="form-error">{{ credential_form_errors['annual_minimum'] }}</div>{% endif %}
 
+          <label>Grace period after cycle end (optional)
+            <input type="text" name="grace_period_days" value="{{ credential_form_values.get('grace_period_days', '') }}" placeholder="e.g. 90 — leave blank if the issuer has none">
+          </label>
+          {% if credential_form_errors.get('grace_period_days') %}<div class="form-error">{{ credential_form_errors['grace_period_days'] }}</div>{% endif %}
+
           <div class="cf-categories">
             <div class="form-applies-label">Category rules (optional)</div>
             <div id="category-rows">
@@ -160,11 +165,13 @@
                   <option value="max" {% if cat.rule_type == 'max' %}selected{% endif %}>at most</option>
                 </select>
                 <input type="text" name="category_target" value="{{ cat.target }}" placeholder="hours">
+                <input type="text" class="category-parent-input" name="category_parent" value="{{ cat.parent_name or '' }}" placeholder="nested under (optional)">
                 <button type="button" class="category-remove-btn" onclick="this.closest('.category-rule-row').remove()">×</button>
               </div>
               {% endfor %}
             </div>
             {% if credential_form_errors.get('categories') %}<div class="form-error">{{ credential_form_errors['categories'] }}</div>{% endif %}
+            <div class="cf-hint">Optionally nest a rule under another by typing that rule's exact name in "nested under" — e.g. Ways of Working nested under Education — and its hours roll up into the parent's total too.</div>
             <button type="button" class="btn-secondary small" onclick="cfAddCategoryRow()">+ Add category rule</button>
           </div>
         </div>
@@ -205,6 +212,7 @@
             <option value="max">at most</option>
           </select>
           <input type="text" name="category_target" placeholder="hours">
+          <input type="text" class="category-parent-input" name="category_parent" placeholder="nested under (optional)">
           <button type="button" class="category-remove-btn" onclick="this.closest('.category-rule-row').remove()">×</button>
         </div>
       </template>
@@ -329,7 +337,7 @@
         {% if credential.categories %}
         <div class="categories">
           {% for cat in credential.categories %}
-          <div class="category-row">
+          <div class="category-row {{ 'category-row--nested' if cat.depth else '' }}" style="margin-left:{{ cat.depth * 20 }}px">
             <div class="category-label">{{ cat.label }}</div>
             <div class="category-bar"><div class="category-bar-fill" style="width:{{ cat.pct }}%;background:{{ cat.bar_color }}"></div></div>
           </div>
@@ -371,9 +379,12 @@
               <input type="text" name="provider" value="{{ form_values.get('provider', '') }}" placeholder="e.g. Northbridge Learning">
             </label>
             <label>Category
-              <input type="text" name="category" value="{{ form_values.get('category', '') }}" placeholder="e.g. Technical">
+              <input type="text" name="category" value="{{ form_values.get('category', '') }}" placeholder="e.g. Technical" list="category-options" autocomplete="off">
             </label>
           </div>
+          <datalist id="category-options">
+            {% for opt in category_options %}<option value="{{ opt }}">{% endfor %}
+          </datalist>
 
           <div class="form-applies">
             <div class="form-applies-label">Applies to</div>

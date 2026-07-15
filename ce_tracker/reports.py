@@ -54,7 +54,8 @@ def build_activity_report_pdf(credential_row, in_cycle_activities, category_resu
         cat_data = [["Category", "Rule", "Earned", "Target", "Result"]]
         for c in category_results:
             rule = "at least" if c["rule_type"] == "min" else "at most"
-            cat_data.append([c["name"], rule, f"{c['earned']:g}", f"{c['target']:g}", "Met" if c["ok"] else "Not met"])
+            indent = "    " * c.get("depth", 0)
+            cat_data.append([indent + c["name"], rule, f"{c['earned']:g}", f"{c['target']:g}", "Met" if c["ok"] else "Not met"])
         cat_table = Table(cat_data, hAlign="LEFT")
         cat_table.setStyle(HEADER_STYLE)
         story.append(cat_table)

@@ -3,8 +3,14 @@
 from . import progress
 from .db import get_db
 
-STATUS_COLOR = {"on-track": "#1f9d7c", "at-risk": "#d68f1f", "reminder": "#667085", "expired": "#d64545"}
-STATUS_LABEL = {"on-track": "On track", "at-risk": "At risk", "reminder": "Reminder only", "expired": "Expired"}
+STATUS_COLOR = {
+    "on-track": "#1f9d7c", "at-risk": "#d68f1f", "reminder": "#667085",
+    "grace-period": "#c1440e", "expired": "#d64545",
+}
+STATUS_LABEL = {
+    "on-track": "On track", "at-risk": "At risk", "reminder": "Reminder only",
+    "grace-period": "In grace period", "expired": "Expired",
+}
 ACT_STATUS_COLOR = {"submitted": "#1f9d7c", "logged": "#98a2b3"}
 ACT_STATUS_LABEL = {"submitted": "Submitted", "logged": "Logged, not yet filed"}
 
@@ -13,19 +19,22 @@ ACT_STATUS_LABEL = {"submitted": "Submitted", "logged": "Logged, not yet filed"}
 STATUS_LEGEND = [
     {"color": STATUS_COLOR["on-track"], "label": "On track — earning at a healthy pace this cycle"},
     {"color": STATUS_COLOR["at-risk"], "label": "At risk — behind pace or a deadline is coming up"},
+    {"color": STATUS_COLOR["grace-period"], "label": "In grace period — past the deadline, still time to submit"},
     {"color": STATUS_COLOR["reminder"], "label": "Reminder only — no CE hours tracked for this one"},
 ]
 
 
 def _category_view(result):
     """result is one of progress.compute_progress()'s category_results entries — earned/ok
-    are already computed from summed activity hours, this just adds display formatting."""
+    are already computed from summed activity hours (rolled up from any nested sub-categories),
+    this just adds display formatting. `depth` indents nested rows in the Overview tab."""
     pct = min(100, round((result["earned"] / result["target"]) * 100)) if result["target"] else 0
     return {
         "name": result["name"],
         "earned": result["earned"],
         "target": result["target"],
         "ok": result["ok"],
+        "depth": result.get("depth", 0),
         "label": f"{result['name']}: {result['earned']:g}/{result['target']:g} {'✓' if result['ok'] else '✗'}",
         "bar_color": "#1f9d7c" if result["ok"] else "#d68f1f",
         "pct": pct,
@@ -48,7 +57,7 @@ def _activity_view(row):
 
 def _fetch_categories(conn, credential_id):
     return conn.execute(
-        "SELECT name, target, rule_type FROM categories WHERE credential_id = ?", (credential_id,)
+        "SELECT id, name, target, rule_type, parent_id FROM categories WHERE credential_id = ?", (credential_id,)
     ).fetchall()
 
 
@@ -69,7 +78,9 @@ def _annual_label(row, annual_earned):
     return None
 
 
-def _days_label(status, days_left):
+def _days_label(status, days_left, grace_days_left=None):
+    if status == "grace-period":
+        return f"{grace_days_left} days left in grace period to submit"
     if days_left is None:
         return ""
     if status == "reminder":
@@ -115,7 +126,7 @@ def credential_view(row, conn):
         "member_id": row["member_id"],
         "cycle_label": row["cycle_label"],
         "days_left": prog["days_left"],
-        "days_label": _days_label(status, prog["days_left"]),
+        "days_label": _days_label(status, prog["days_left"], prog["grace_days_left"]),
         "pct": pct,
         "pct_label": pct_label,
         "earned_label": earned_label,

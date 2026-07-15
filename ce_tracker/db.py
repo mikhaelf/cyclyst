@@ -14,10 +14,9 @@ CREDENTIAL_COLUMNS = [
     ("reporting_calendar", "TEXT"),  # 'calendar_year' | 'cycle_anniversary'; NULL for 'exam'
     ("annual_minimum", "INTEGER"),
     ("annual_minimum_type", "TEXT"),  # 'suggested' | 'mandatory'
-    # Schema-only for now (design doc §9) — no computation branch reads these yet.
-    ("grace_period_days", "INTEGER"),
-    ("renews", "TEXT"),
-    ("depends_on", "TEXT"),
+    ("grace_period_days", "INTEGER"),  # post-cycle-end window to finish earning/submitting; NULL = hard cutoff
+    ("depends_on", "TEXT"),  # cascade — see progress.apply_dependency_cascade
+    ("renews", "TEXT"),  # schema-only for now (design doc §9) — no computation branch reads this yet
 ]
 
 SCHEMA = """
@@ -47,7 +46,8 @@ CREATE TABLE IF NOT EXISTS categories (
     name TEXT NOT NULL,
     earned REAL NOT NULL,
     target REAL NOT NULL,
-    rule_type TEXT NOT NULL -- 'min' or 'max'
+    rule_type TEXT NOT NULL, -- 'min' or 'max'
+    parent_id INTEGER REFERENCES categories(id) -- optional nesting, e.g. PMI's Talent Triangle legs inside "Education"
 );
 
 CREATE TABLE IF NOT EXISTS activities (
@@ -174,6 +174,50 @@ def _migrate_dependency_any_of_column(conn):
     conn.execute("ALTER TABLE credentials ADD COLUMN depends_on_any_of TEXT")  # comma-separated credential ids
 
 
+def _migrate_category_parent_column(conn):
+    """Adds nesting to category rules via a self-referential parent_id — the generic shape
+    design doc §3 already sketched (`category_rules` + `sub_requirements`), e.g. PMI's Talent
+    Triangle legs living inside a "Education" bucket, or ISC2's ISSEP sub-quota inside Group A.
+    This is deliberately generic (any credential can nest any category under any other) rather
+    than a PMI-specific column, so it backfills PMP's own Education/Giving Back split as data,
+    not as special-cased code."""
+    existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(categories)")}
+    if "parent_id" in existing_cols:
+        return
+    conn.execute("ALTER TABLE categories ADD COLUMN parent_id INTEGER REFERENCES categories(id)")
+
+    pmp_rows = conn.execute("SELECT id FROM categories WHERE credential_id = 'pmp'").fetchall()
+    if pmp_rows:
+        talent_triangle_ids = [r["id"] for r in pmp_rows]
+        education_id = conn.execute(
+            "INSERT INTO categories (credential_id, name, earned, target, rule_type) "
+            "VALUES ('pmp', 'Education', 0, 35, 'min')"
+        ).lastrowid
+        conn.execute(
+            "INSERT INTO categories (credential_id, name, earned, target, rule_type) "
+            "VALUES ('pmp', 'Giving Back', 0, 25, 'max')"
+        )
+        placeholders = ",".join("?" * len(talent_triangle_ids))
+        conn.execute(
+            f"UPDATE categories SET parent_id = ? WHERE id IN ({placeholders})",
+            (education_id, *talent_triangle_ids),
+        )
+
+
+def _migrate_grace_period_backfill(conn):
+    """`grace_period_days` (design doc §3/§9) has existed as a schema column since the first
+    computed-progress migration but was never backfilled or read by progress.py — this wires
+    it up with the one real, confirmed value we have: ISC2's Certification Maintenance
+    Handbook documents a 90-day post-cycle-end grace period to finish earning/submitting CPEs
+    before suspension. Only setting it for the one ISC2-issued credential actually tracked
+    (CISSP) — other issuers' grace periods aren't confirmed, so they stay NULL (no hard
+    guess) rather than assuming a number. Guarded on NULL, not on first-run, so it's safe to
+    run every init_db() without clobbering a value later corrected via the Edit Credential form."""
+    conn.execute(
+        "UPDATE credentials SET grace_period_days = 90 WHERE id = 'cissp' AND grace_period_days IS NULL"
+    )
+
+
 def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = get_db()
@@ -181,6 +225,8 @@ def init_db():
     _migrate_credential_columns(conn)
     _migrate_member_id_column(conn)
     _migrate_dependency_any_of_column(conn)
+    _migrate_category_parent_column(conn)
+    _migrate_grace_period_backfill(conn)
     conn.commit()
     conn.close()
 
@@ -226,13 +272,28 @@ def seed_db():
     categories = [
         ("cissp", "Group A", 65, 90, "min"),
         ("cissp", "Group B", 13, 30, "max"),
-        ("pmp", "Ways of Working", 8, 8, "min"),
-        ("pmp", "Power Skills", 5, 8, "min"),
-        ("pmp", "Business Acumen", 10, 8, "min"),
     ]
     conn.executemany(
         "INSERT INTO categories (credential_id, name, earned, target, rule_type) VALUES (?,?,?,?,?)",
         categories,
+    )
+
+    # PMP's nested shape — a top-level Education/Giving Back split with the Talent Triangle
+    # legs living inside Education — demonstrates the generic parent_id nesting mechanism
+    # (not PMI-specific code; any credential's category rows can nest this way).
+    education_id = conn.execute(
+        "INSERT INTO categories (credential_id, name, earned, target, rule_type) VALUES ('pmp', 'Education', 23, 35, 'min')"
+    ).lastrowid
+    conn.execute(
+        "INSERT INTO categories (credential_id, name, earned, target, rule_type) VALUES ('pmp', 'Giving Back', 0, 25, 'max')"
+    )
+    conn.executemany(
+        "INSERT INTO categories (credential_id, name, earned, target, rule_type, parent_id) VALUES (?,?,?,?,?,?)",
+        [
+            ("pmp", "Ways of Working", 8, 8, "min", education_id),
+            ("pmp", "Power Skills", 5, 8, "min", education_id),
+            ("pmp", "Business Acumen", 10, 8, "min", education_id),
+        ],
     )
 
     activities = [

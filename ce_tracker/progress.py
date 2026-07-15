@@ -5,7 +5,7 @@ depends_on cascade (branch 4); 'mandatory_module' and the 'renews' stacking rela
 are still schema-only.
 """
 
-from datetime import date
+from datetime import date, timedelta
 
 
 def _in_window(activity_date, start, end):
@@ -40,6 +40,51 @@ def _anniversary_window(cycle_start_date, today):
     return anniv.isoformat(), window_end.isoformat()
 
 
+def _compute_category_results(activities, categories, cycle_start, cycle_end):
+    """Category rules can nest (a category's `parent_id` points at another category row for
+    the same credential) — e.g. PMI's Talent Triangle legs living inside an "Education"
+    bucket, or ISC2's ISSEP sub-quota inside Group A (design doc §3's `category_rules` +
+    `sub_requirements`). A parent's earned total rolls up its own directly-tagged activities
+    plus everything earned by its descendants, so activities can be logged against whichever
+    level is most specific without double-entry. Flat (non-nested) categories — the common
+    case — behave exactly as before: no parent, no children, earned = direct match only.
+    This is entirely data-driven per credential; nothing here is specific to any one issuer.
+    """
+    children_by_parent = {}
+    for cat in categories:
+        parent_id = cat["parent_id"] if "parent_id" in cat.keys() else None
+        if parent_id:
+            children_by_parent.setdefault(parent_id, []).append(cat)
+
+    def direct_earned(cat):
+        return _sum_hours(activities, start=cycle_start, end=cycle_end, category=cat["name"])
+
+    def rollup_earned(cat):
+        total = direct_earned(cat)
+        cat_id = cat["id"] if "id" in cat.keys() else None
+        for child in children_by_parent.get(cat_id, []):
+            total += rollup_earned(child)
+        return total
+
+    def build(cat, depth):
+        earned = rollup_earned(cat)
+        ok = earned >= cat["target"] if cat["rule_type"] == "min" else earned <= cat["target"]
+        results = [{
+            "name": cat["name"], "earned": earned, "target": cat["target"],
+            "rule_type": cat["rule_type"], "ok": ok, "depth": depth,
+        }]
+        cat_id = cat["id"] if "id" in cat.keys() else None
+        for child in children_by_parent.get(cat_id, []):
+            results.extend(build(child, depth + 1))
+        return results
+
+    top_level = [c for c in categories if not (("parent_id" in c.keys()) and c["parent_id"])]
+    category_results = []
+    for cat in top_level:
+        category_results.extend(build(cat, 0))
+    return category_results
+
+
 def compute_progress(credential_row, activities, categories, today=None):
     """activities: rows already filtered to ones whose `applies` includes this credential.
     categories: this credential's category-rule rows. Returns a dict of computed values —
@@ -53,14 +98,14 @@ def compute_progress(credential_row, activities, categories, today=None):
         status = "reminder" if (days_left is None or days_left >= 0) else "expired"
         return {
             "status": status, "pct": None, "earned": None, "days_left": days_left,
-            "on_track": None, "annual_earned": None, "category_results": [],
+            "on_track": None, "annual_earned": None, "category_results": [], "grace_days_left": None,
         }
 
     if renewal_type != "cpe_hours":
         # mandatory_module / other future types — no computation branch yet, surface neutrally
         return {
             "status": "reminder", "pct": None, "earned": None, "days_left": None,
-            "on_track": None, "annual_earned": None, "category_results": [],
+            "on_track": None, "annual_earned": None, "category_results": [], "grace_days_left": None,
         }
 
     cycle_start = credential_row["cycle_start_date"]
@@ -77,8 +122,25 @@ def compute_progress(credential_row, activities, categories, today=None):
     days_elapsed = max(0, (today - start_d).days)
     on_track = (earned / total) >= (days_elapsed / days_total) if total and days_total > 0 else True
 
+    # Grace period (design doc §4 branch 2): past cycle_end with hours still short doesn't mean
+    # expired outright if this issuer gives a post-deadline window to finish earning/submitting
+    # (e.g. ISC2's 90 days) — `grace_period_days` is generic per credential, NULL means "no
+    # grace, hard cutoff" (matches issuers like GIAC per the design doc).
+    grace_period_days = credential_row["grace_period_days"] if "grace_period_days" in credential_row.keys() else None
+    grace_days_left = None
+
     if today > end_d:
-        status = "on-track" if earned >= total else "expired"
+        if earned >= total:
+            status = "on-track"
+        elif grace_period_days:
+            grace_end_d = end_d + timedelta(days=grace_period_days)
+            if today <= grace_end_d:
+                status = "grace-period"
+                grace_days_left = (grace_end_d - today).days
+            else:
+                status = "expired"
+        else:
+            status = "expired"
     elif on_track:
         status = "on-track"
     else:
@@ -93,18 +155,12 @@ def compute_progress(credential_row, activities, categories, today=None):
             window_start, window_end = _anniversary_window(cycle_start, today)
         annual_earned = _sum_hours(activities, start=window_start, end=window_end)
 
-    category_results = []
-    for cat in categories:
-        cat_earned = _sum_hours(activities, start=cycle_start, end=cycle_end, category=cat["name"])
-        ok = cat_earned >= cat["target"] if cat["rule_type"] == "min" else cat_earned <= cat["target"]
-        category_results.append({
-            "name": cat["name"], "earned": cat_earned, "target": cat["target"],
-            "rule_type": cat["rule_type"], "ok": ok,
-        })
+    category_results = _compute_category_results(activities, categories, cycle_start, cycle_end)
 
     return {
         "status": status, "pct": pct, "earned": earned, "days_left": days_left,
         "on_track": on_track, "annual_earned": annual_earned, "category_results": category_results,
+        "grace_days_left": grace_days_left,
     }
 
 

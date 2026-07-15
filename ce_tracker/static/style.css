@@ -222,6 +222,8 @@ html, body {
 .note-callout.cascade-warning { color: #7a271a; background: #fef3f2; border-color: #fecdca; }
 
 .categories { margin-top: 22px; display: flex; flex-direction: column; gap: 12px; }
+.category-row--nested .category-label { color: #667085; font-weight: 400; }
+.category-row--nested .category-bar { height: 5px; }
 .category-label { font: 12.5px -apple-system, sans-serif; color: #344054; margin-bottom: 5px; }
 .category-bar { height: 7px; background: #eaecf0; border-radius: 4px; overflow: hidden; }
 .category-bar-fill { height: 100%; border-radius: 4px; }
@@ -361,6 +363,8 @@ html, body {
 }
 .category-rule-row input[type="text"] { flex: 1; }
 .category-rule-row select { flex: none; width: 100px; }
+.category-rule-row .category-parent-input { flex: 0 0 150px; }
+.cf-hint { font: 12px -apple-system, sans-serif; color: #98a2b3; }
 .category-remove-btn {
   flex: none; border: none; background: transparent; cursor: pointer;
   font: 600 15px -apple-system, sans-serif; color: #98a2b3; line-height: 1; padding: 4px 6px;
