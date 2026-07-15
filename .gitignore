@@ -7,3 +7,6 @@ __pycache__/
 
 # local data (private, per CLAUDE.md hard constraints)
 data/*.db
+
+# one-off ingest material, not part of the tracked project
+Credential Manager.zip

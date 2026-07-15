@@ -1,6 +1,9 @@
 <div class="app-shell">
   <aside class="sidebar">
     <div class="sidebar-title">CE Tracker</div>
+    <button class="add-credential-btn"
+            hx-get="{{ url_for('main.new_credential_form') }}"
+            hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">+ Add Credential</button>
     <div class="cred-list">
       {% for c in sidebar %}
       <div class="credrow {{ 'active' if credential and credential.id == c.id else '' }}"
@@ -67,10 +70,165 @@
       </div>
       {% endfor %}
     </div>
+    {% elif credential_form_view %}
+    <div class="credential-form-panel">
+      <div class="docs-header">
+        <div class="detail-name">{{ 'Add Credential' if credential_form_mode == 'add' else ('Edit ' ~ credential_form_values.get('name', 'Credential')) }}</div>
+        <div class="detail-sub">{{ 'Capture the dates and rules for a new credential so progress can be computed automatically.' if credential_form_mode == 'add' else "Update this credential's dates, requirements, or category rules." }}</div>
+      </div>
+
+      <form class="credential-form"
+            hx-post="{{ url_for('main.create_credential') if credential_form_mode == 'add' else url_for('main.update_credential', credential_id=credential_form_id, tab=tab) }}"
+            hx-target="#app-body" hx-swap="innerHTML">
+
+        <div class="cf-row">
+          <label>Name*
+            <input type="text" name="name" value="{{ credential_form_values.get('name', '') }}" placeholder="e.g. CISSP">
+          </label>
+          <label>Issuer*
+            <input type="text" name="issuer" value="{{ credential_form_values.get('issuer', '') }}" placeholder="e.g. ISC2">
+          </label>
+        </div>
+        {% if credential_form_errors.get('name') %}<div class="form-error">{{ credential_form_errors['name'] }}</div>{% endif %}
+        {% if credential_form_errors.get('issuer') %}<div class="form-error">{{ credential_form_errors['issuer'] }}</div>{% endif %}
+
+        <label>Member / cert ID (optional)
+          <input type="text" name="member_id" value="{{ credential_form_values.get('member_id', '') }}" placeholder="e.g. REDACTED_MEMBER_ID">
+        </label>
+
+        <label>Renewal type*
+          <select name="renewal_type" id="cf-renewal-type" onchange="cfToggleRenewalType()">
+            <option value="cpe_hours" {% if credential_form_values.get('renewal_type', 'cpe_hours') == 'cpe_hours' %}selected{% endif %}>CE Hours / Points</option>
+            <option value="exam" {% if credential_form_values.get('renewal_type') == 'exam' %}selected{% endif %}>Exam-only — no CE tracked</option>
+          </select>
+        </label>
+
+        <div class="cf-group" data-renewal-type="cpe_hours">
+          <div class="cf-row">
+            <label>Current cycle started*
+              <input type="date" name="cycle_start_date" value="{{ credential_form_values.get('cycle_start_date', '') }}">
+            </label>
+            <label>Cycle length (years)*
+              <input type="text" name="cycle_years" value="{{ credential_form_values.get('cycle_years', '') }}" placeholder="e.g. 3">
+            </label>
+          </div>
+          {% if credential_form_errors.get('cycle_start_date') %}<div class="form-error">{{ credential_form_errors['cycle_start_date'] }}</div>{% endif %}
+          {% if credential_form_errors.get('cycle_years') %}<div class="form-error">{{ credential_form_errors['cycle_years'] }}</div>{% endif %}
+
+          <div class="cf-row">
+            <label>Unit
+              <input type="text" name="unit" value="{{ credential_form_values.get('unit', 'hours') }}" placeholder="hours / PDU / credits">
+            </label>
+            <label>Required for full cycle*
+              <input type="text" name="total" value="{{ credential_form_values.get('total', '') }}" placeholder="e.g. 120">
+            </label>
+          </div>
+          {% if credential_form_errors.get('total') %}<div class="form-error">{{ credential_form_errors['total'] }}</div>{% endif %}
+
+          <label>Reporting calendar*
+            <select name="reporting_calendar">
+              <option value="cycle_anniversary" {% if credential_form_values.get('reporting_calendar', 'cycle_anniversary') == 'cycle_anniversary' %}selected{% endif %}>Cycle anniversary</option>
+              <option value="calendar_year" {% if credential_form_values.get('reporting_calendar') == 'calendar_year' %}selected{% endif %}>Calendar year (Jan–Dec)</option>
+            </select>
+          </label>
+
+          <div class="cf-row">
+            <label>Annual requirement
+              <select name="annual_minimum_type" id="cf-annual-type" onchange="cfToggleAnnualMinimum()">
+                <option value="" {% if not credential_form_values.get('annual_minimum_type') %}selected{% endif %}>None</option>
+                <option value="suggested" {% if credential_form_values.get('annual_minimum_type') == 'suggested' %}selected{% endif %}>Suggested pace</option>
+                <option value="mandatory" {% if credential_form_values.get('annual_minimum_type') == 'mandatory' %}selected{% endif %}>Mandatory minimum</option>
+              </select>
+            </label>
+            <label id="cf-annual-minimum-wrap">Per year
+              <input type="text" name="annual_minimum" value="{{ credential_form_values.get('annual_minimum', '') }}" placeholder="e.g. 20">
+            </label>
+          </div>
+          {% if credential_form_errors.get('annual_minimum') %}<div class="form-error">{{ credential_form_errors['annual_minimum'] }}</div>{% endif %}
+
+          <div class="cf-categories">
+            <div class="form-applies-label">Category rules (optional)</div>
+            <div id="category-rows">
+              {% for cat in credential_form_categories %}
+              <div class="category-rule-row">
+                <input type="text" name="category_name" value="{{ cat.name }}" placeholder="e.g. Group A">
+                <select name="category_rule">
+                  <option value="min" {% if cat.rule_type == 'min' %}selected{% endif %}>at least</option>
+                  <option value="max" {% if cat.rule_type == 'max' %}selected{% endif %}>at most</option>
+                </select>
+                <input type="text" name="category_target" value="{{ cat.target }}" placeholder="hours">
+                <button type="button" class="category-remove-btn" onclick="this.closest('.category-rule-row').remove()">×</button>
+              </div>
+              {% endfor %}
+            </div>
+            {% if credential_form_errors.get('categories') %}<div class="form-error">{{ credential_form_errors['categories'] }}</div>{% endif %}
+            <button type="button" class="btn-secondary small" onclick="cfAddCategoryRow()">+ Add category rule</button>
+          </div>
+        </div>
+
+        <div class="cf-group" data-renewal-type="exam">
+          <label>Expiration / re-exam due date*
+            <input type="date" name="cycle_end_date" value="{{ credential_form_values.get('cycle_end_date', '') }}">
+          </label>
+          {% if credential_form_errors.get('cycle_end_date') %}<div class="form-error">{{ credential_form_errors['cycle_end_date'] }}</div>{% endif %}
+        </div>
+
+        <label>Note (optional)
+          <textarea name="note" rows="2" placeholder="A callout shown on the Overview tab, e.g. a self-report deadline">{{ credential_form_values.get('note', '') }}</textarea>
+        </label>
+
+        <div class="cf-row">
+          <label>Badge platform (optional)
+            <input type="text" name="badge_platform" value="{{ credential_form_values.get('badge_platform', '') }}" placeholder="e.g. Credly">
+          </label>
+          <label>Public badge URL (optional)
+            <input type="text" name="badge_url" value="{{ credential_form_values.get('badge_url', '') }}" placeholder="https://www.credly.com/badges/...">
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">{{ 'Add Credential' if credential_form_mode == 'add' else 'Save Changes' }}</button>
+          <button type="button" class="btn-secondary"
+                  hx-get="{{ url_for('main.view_fragment', selected=(credential_form_id or (credential.id if credential else '')), tab=tab) }}"
+                  hx-target="#app-body" hx-swap="innerHTML">Cancel</button>
+        </div>
+      </form>
+
+      <template id="category-row-template">
+        <div class="category-rule-row">
+          <input type="text" name="category_name" placeholder="e.g. Group A">
+          <select name="category_rule">
+            <option value="min">at least</option>
+            <option value="max">at most</option>
+          </select>
+          <input type="text" name="category_target" placeholder="hours">
+          <button type="button" class="category-remove-btn" onclick="this.closest('.category-rule-row').remove()">×</button>
+        </div>
+      </template>
+    </div>
+
+    <script>
+      function cfToggleRenewalType() {
+        var val = document.getElementById('cf-renewal-type').value;
+        document.querySelectorAll('.cf-group').forEach(function (el) {
+          el.style.display = (el.dataset.renewalType === val) ? '' : 'none';
+        });
+      }
+      function cfToggleAnnualMinimum() {
+        var val = document.getElementById('cf-annual-type').value;
+        document.getElementById('cf-annual-minimum-wrap').style.display = val ? '' : 'none';
+      }
+      function cfAddCategoryRow() {
+        var tmpl = document.getElementById('category-row-template');
+        document.getElementById('category-rows').appendChild(tmpl.content.cloneNode(true));
+      }
+      cfToggleRenewalType();
+      cfToggleAnnualMinimum();
+    </script>
     {% elif credential %}
     <div class="detail-header">
       <div>
-        <div class="detail-name">{{ credential.name }}</div>
+        <div class="detail-name">{{ credential.name }}{% if credential.member_id %} <span class="detail-member-id">· {{ credential.member_id }}</span>{% endif %}</div>
         <div class="detail-sub">{{ credential.issuer }} · {{ credential.cycle_label }}</div>
       </div>
       <div class="detail-status">
@@ -124,6 +282,9 @@
           <button class="badge-edit-link"
                   hx-get="{{ url_for('main.edit_badge_form', credential_id=credential.id, tab=tab) }}"
                   hx-target="#app-body" hx-swap="innerHTML">{{ 'Edit link' if credential.badge_platform else '+ Add public link' }}</button>
+          <button class="badge-edit-link"
+                  hx-get="{{ url_for('main.edit_credential_form', credential_id=credential.id, tab=tab) }}"
+                  hx-target="#app-body" hx-swap="innerHTML">Edit credential</button>
           <button class="archive-link"
                   hx-get="{{ url_for('main.archive_form', credential_id=credential.id, tab=tab) }}"
                   hx-target="#app-body" hx-swap="innerHTML">Archive credential</button>
@@ -241,6 +402,10 @@
               <div class="activity-hours">{{ a.hours_label }}</div>
               <div class="activity-status" style="color:{{ a.status_color }}">{{ a.status_label }}</div>
             </div>
+            <button class="activity-delete-btn"
+                    hx-delete="{{ url_for('main.delete_activity', activity_id=a.id, selected=credential.id, tab='activity') }}"
+                    hx-target="#app-body" hx-swap="innerHTML"
+                    hx-confirm="Delete this activity? This can't be undone.">×</button>
           </div>
           {% endfor %}
         {% else %}
@@ -273,8 +438,8 @@
       {% elif tab == 'reports' %}
         <div class="reports-copy">Generate an itemized record for {{ credential.name }} covering the current cycle ({{ credential.cycle_label }}) — {{ credential.earned_label }}.</div>
         <div class="reports-actions">
-          <button class="btn-primary" disabled title="Not implemented yet">Export Markdown/PDF</button>
-          <button class="btn-secondary" disabled title="Not implemented yet">Export CSV (issuer format)</button>
+          <a class="btn-primary" href="{{ url_for('main.export_activities_csv', credential_id=credential.id) }}">Export CSV</a>
+          <button class="btn-secondary" disabled title="Not implemented yet">Export PDF</button>
         </div>
       {% endif %}
     </div>

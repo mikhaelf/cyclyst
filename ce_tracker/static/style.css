@@ -34,6 +34,13 @@ html, body {
   overflow-y: auto;
 }
 .sidebar-title { padding: 0 20px 18px; font: 700 15px -apple-system, sans-serif; letter-spacing: -.2px; }
+.add-credential-btn {
+  margin: 0 20px 16px; padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, .16); border-radius: 7px;
+  background: rgba(255, 255, 255, .06); color: #fff; cursor: pointer;
+  font: 600 12px -apple-system, sans-serif; text-align: left;
+}
+.add-credential-btn:hover { background: rgba(255, 255, 255, .12); }
 .cred-list { display: flex; flex-direction: column; }
 .credrow { padding: 12px 20px; cursor: pointer; }
 .credrow:hover { background: rgba(255, 255, 255, .06); }
@@ -100,6 +107,7 @@ html, body {
 .detail-panel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .detail-header { padding: 22px 26px 0; display: flex; align-items: baseline; justify-content: space-between; }
 .detail-name { font: 700 21px -apple-system, sans-serif; color: #161a23; }
+.detail-member-id { font: 600 14px -apple-system, sans-serif; color: #98a2b3; }
 .detail-sub { font: 13px -apple-system, sans-serif; color: #667085; margin-top: 3px; }
 .detail-status { text-align: right; }
 .status-label { font: 700 13px -apple-system, sans-serif; }
@@ -245,6 +253,12 @@ html, body {
 .activity-right { text-align: right; }
 .activity-hours { font: 700 13px -apple-system, sans-serif; color: #344054; }
 .activity-status { font: 10.5px -apple-system, sans-serif; }
+.activity-delete-btn {
+  flex: none; margin-left: 14px;
+  border: none; background: transparent; cursor: pointer;
+  font: 600 16px -apple-system, sans-serif; color: #c8ccd4; line-height: 1; padding: 4px 6px;
+}
+.activity-delete-btn:hover { color: #d64545; }
 
 /* Pending tab */
 .pending-card {
@@ -269,6 +283,7 @@ html, body {
 .reports-actions { display: flex; gap: 10px; margin-top: 14px; }
 .btn-primary, .btn-secondary, .btn-danger {
   font: 600 12.5px -apple-system, sans-serif; padding: 9px 16px; border-radius: 7px; cursor: pointer;
+  display: inline-block; text-decoration: none;
 }
 .btn-primary { border: none; background: #161a23; color: #fff; }
 .btn-secondary { border: 1px solid #eaecf0; background: #fff; color: #344054; }
@@ -302,3 +317,39 @@ html, body {
   font: 600 11px -apple-system, sans-serif; color: #98a2b3; text-decoration: none;
 }
 .docs-backtotop:hover { color: #2a6fd6; text-decoration: underline; }
+
+/* Add/Edit Credential form */
+.credential-form-panel { padding: 22px 26px 26px; overflow-y: auto; flex: 1; }
+.credential-form {
+  display: flex; flex-direction: column; gap: 14px;
+  max-width: 480px; margin-top: 18px;
+}
+.credential-form label {
+  display: flex; flex-direction: column; gap: 4px; flex: 1;
+  font: 600 12px -apple-system, sans-serif; color: #344054;
+}
+.credential-form input[type="text"],
+.credential-form input[type="date"],
+.credential-form select,
+.credential-form textarea {
+  font: 13px -apple-system, sans-serif; color: #161a23;
+  border: 1px solid #eaecf0; border-radius: 6px; padding: 8px 10px;
+  background: #fff;
+}
+.credential-form textarea { resize: vertical; font-family: inherit; }
+.cf-row { display: flex; gap: 16px; }
+.cf-group {
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 14px 16px; background: #f7f8fa; border: 1px solid #eaecf0; border-radius: 9px;
+}
+.cf-categories { display: flex; flex-direction: column; gap: 8px; }
+.category-rule-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.category-rule-row input[type="text"] { flex: 1; }
+.category-rule-row select { flex: none; width: 100px; }
+.category-remove-btn {
+  flex: none; border: none; background: transparent; cursor: pointer;
+  font: 600 15px -apple-system, sans-serif; color: #98a2b3; line-height: 1; padding: 4px 6px;
+}
+.category-remove-btn:hover { color: #d64545; }

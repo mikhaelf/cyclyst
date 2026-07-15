@@ -1,6 +1,9 @@
+import csv
+import io
+import re
 from datetime import date
 
-from flask import Blueprint, render_template, request
+from flask import Blueprint, Response, render_template, request
 
 from . import views
 from .db import get_db
@@ -35,6 +38,12 @@ def _body_context(selected_id, tab):
         "badge_form_errors": {},
         "status_legend": views.STATUS_LEGEND,
         "show_archive_form": False,
+        "credential_form_view": False,
+        "credential_form_mode": None,
+        "credential_form_id": None,
+        "credential_form_values": {},
+        "credential_form_errors": {},
+        "credential_form_categories": [],
     }
     conn.close()
     return context
@@ -89,6 +98,143 @@ def _parse_badge_form(form):
         errors["badge_platform"] = "Add a platform name (e.g. Credly) so the link can be labeled."
 
     return {"badge_platform": platform, "badge_url": url}, errors
+
+
+def _derive_badge_visibility(platform, url):
+    if url:
+        return "public"
+    if platform:
+        return "private"
+    return None
+
+
+def _slugify(name, existing_ids):
+    base = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-") or "credential"
+    slug = base
+    n = 2
+    while slug in existing_ids:
+        slug = f"{base}-{n}"
+        n += 1
+    return slug
+
+
+def _parse_credential_form(form):
+    """Validate the Add/Edit Credential form. Returns (values_for_redisplay, parsed_db_values, errors).
+    `parsed_db_values` has renewal_type-appropriate fields resolved to their DB-ready types
+    (dates as ISO strings, numbers as float) and unused fields set to None."""
+    errors = {}
+
+    name = (form.get("name") or "").strip()
+    if not name:
+        errors["name"] = "Name is required."
+    issuer = (form.get("issuer") or "").strip()
+    if not issuer:
+        errors["issuer"] = "Issuer is required."
+
+    renewal_type = form.get("renewal_type") or "cpe_hours"
+    if renewal_type not in ("cpe_hours", "exam"):
+        renewal_type = "cpe_hours"
+
+    values = {
+        "name": name,
+        "issuer": issuer,
+        "member_id": (form.get("member_id") or "").strip(),
+        "renewal_type": renewal_type,
+        "cycle_start_date": (form.get("cycle_start_date") or "").strip(),
+        "cycle_years": (form.get("cycle_years") or "").strip(),
+        "unit": (form.get("unit") or "").strip() or "hours",
+        "total": (form.get("total") or "").strip(),
+        "reporting_calendar": form.get("reporting_calendar") or "cycle_anniversary",
+        "annual_minimum_type": form.get("annual_minimum_type") or "",
+        "annual_minimum": (form.get("annual_minimum") or "").strip(),
+        "cycle_end_date": (form.get("cycle_end_date") or "").strip(),
+        "note": (form.get("note") or "").strip(),
+        "badge_platform": (form.get("badge_platform") or "").strip(),
+        "badge_url": (form.get("badge_url") or "").strip(),
+    }
+
+    cycle_start_date = None
+    cycle_end_date = None
+    total = None
+    annual_minimum = None
+    annual_minimum_type = values["annual_minimum_type"] if values["annual_minimum_type"] in ("suggested", "mandatory") else None
+
+    if renewal_type == "cpe_hours":
+        if not values["cycle_start_date"]:
+            errors["cycle_start_date"] = "Cycle start date is required."
+        else:
+            try:
+                cycle_start_date = date.fromisoformat(values["cycle_start_date"])
+            except ValueError:
+                errors["cycle_start_date"] = "Enter a valid date."
+
+        cycle_years = None
+        try:
+            cycle_years = int(values["cycle_years"])
+            if cycle_years <= 0:
+                errors["cycle_years"] = "Cycle length must be a positive whole number of years."
+        except ValueError:
+            errors["cycle_years"] = "Enter the cycle length in years (e.g. 3)."
+
+        if cycle_start_date and cycle_years and "cycle_years" not in errors:
+            try:
+                cycle_end_date = cycle_start_date.replace(year=cycle_start_date.year + cycle_years)
+            except ValueError:  # Feb 29 start, non-leap target year
+                cycle_end_date = cycle_start_date.replace(year=cycle_start_date.year + cycle_years, day=28)
+
+        try:
+            total = float(values["total"])
+            if total <= 0:
+                errors["total"] = "Hours/points required must be greater than 0."
+        except ValueError:
+            errors["total"] = "Enter the hours/points required for a full cycle."
+
+        if annual_minimum_type:
+            try:
+                annual_minimum = float(values["annual_minimum"])
+                if annual_minimum <= 0:
+                    errors["annual_minimum"] = "Enter a positive number, or set the requirement to None."
+            except ValueError:
+                errors["annual_minimum"] = "Enter an annual minimum, or set the requirement to None."
+
+    else:  # exam
+        if not values["cycle_end_date"]:
+            errors["cycle_end_date"] = "Expiration date is required."
+        else:
+            try:
+                cycle_end_date = date.fromisoformat(values["cycle_end_date"])
+            except ValueError:
+                errors["cycle_end_date"] = "Enter a valid date."
+
+    category_rows = []
+    names = form.getlist("category_name")
+    rules = form.getlist("category_rule")
+    targets = form.getlist("category_target")
+    for i, cat_name in enumerate(names):
+        cat_name = (cat_name or "").strip()
+        if not cat_name:
+            continue
+        rule = rules[i] if i < len(rules) else "min"
+        target_raw = targets[i] if i < len(targets) else ""
+        try:
+            target = float(target_raw)
+        except ValueError:
+            errors["categories"] = f'Enter a target number for category "{cat_name}".'
+            continue
+        category_rows.append({"name": cat_name, "rule_type": rule if rule in ("min", "max") else "min", "target": target})
+
+    parsed = {
+        "renewal_type": renewal_type,
+        "cycle_start_date": cycle_start_date.isoformat() if cycle_start_date else None,
+        "cycle_end_date": cycle_end_date.isoformat() if cycle_end_date else None,
+        "reporting_calendar": values["reporting_calendar"] if renewal_type == "cpe_hours" else None,
+        "unit": values["unit"] if renewal_type == "cpe_hours" else None,
+        "total": total,
+        "annual_minimum": annual_minimum,
+        "annual_minimum_type": annual_minimum_type if renewal_type == "cpe_hours" else None,
+        "category_rows": category_rows if renewal_type == "cpe_hours" else [],
+    }
+    return values, parsed, errors
 
 
 @bp.route("/")
@@ -162,6 +308,166 @@ def create_activity():
     return render_template("partials/body.html", **_body_context(selected_id, "activity"))
 
 
+@bp.route("/activities/<int:activity_id>", methods=["DELETE"])
+def delete_activity(activity_id):
+    selected_id = request.args.get("selected")
+    tab = request.args.get("tab", "activity")
+
+    conn = get_db()
+    conn.execute("DELETE FROM activities WHERE id = ?", (activity_id,))
+    conn.commit()
+    conn.close()
+
+    return render_template("partials/body.html", **_body_context(selected_id, tab))
+
+
+@bp.route("/credentials/new")
+def new_credential_form():
+    context = _body_context(request.args.get("selected"), request.args.get("tab", "overview"))
+    context["credential_form_view"] = True
+    context["credential_form_mode"] = "add"
+    context["credential_form_values"] = {
+        "renewal_type": "cpe_hours",
+        "reporting_calendar": "cycle_anniversary",
+        "annual_minimum_type": "",
+        "cycle_years": "3",
+        "unit": "hours",
+    }
+    context["credential_form_categories"] = []
+    return render_template("partials/body.html", **context)
+
+
+@bp.route("/credentials", methods=["POST"])
+def create_credential():
+    values, parsed, errors = _parse_credential_form(request.form)
+
+    if errors:
+        context = _body_context(request.args.get("selected"), request.args.get("tab", "overview"))
+        context["credential_form_view"] = True
+        context["credential_form_mode"] = "add"
+        context["credential_form_values"] = values
+        context["credential_form_categories"] = parsed["category_rows"]
+        context["credential_form_errors"] = errors
+        return render_template("partials/body.html", **context)
+
+    badge_platform = values["badge_platform"] or None
+    badge_url = values["badge_url"] or None
+
+    conn = get_db()
+    existing_ids = {r["id"] for r in conn.execute("SELECT id FROM credentials").fetchall()}
+    new_id = _slugify(values["name"], existing_ids)
+
+    conn.execute(
+        "INSERT INTO credentials (id, name, issuer, member_id, status, renewal_type, cycle_start_date, cycle_end_date, "
+        "reporting_calendar, unit, total, annual_minimum, annual_minimum_type, note, "
+        "badge_platform, badge_url, badge_visibility) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            new_id, values["name"], values["issuer"], values["member_id"] or None, "on-track", parsed["renewal_type"],
+            parsed["cycle_start_date"], parsed["cycle_end_date"], parsed["reporting_calendar"],
+            parsed["unit"], parsed["total"], parsed["annual_minimum"], parsed["annual_minimum_type"],
+            values["note"] or None, badge_platform, badge_url,
+            _derive_badge_visibility(badge_platform, badge_url),
+        ),
+    )
+    for cat in parsed["category_rows"]:
+        conn.execute(
+            "INSERT INTO categories (credential_id, name, earned, target, rule_type) VALUES (?,?,0,?,?)",
+            (new_id, cat["name"], cat["target"], cat["rule_type"]),
+        )
+    conn.commit()
+    conn.close()
+
+    return render_template("partials/body.html", **_body_context(new_id, "overview"))
+
+
+@bp.route("/credentials/<credential_id>/edit")
+def edit_credential_form(credential_id):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM credentials WHERE id = ?", (credential_id,)).fetchone()
+    if not row:
+        conn.close()
+        return render_template("partials/body.html", **_body_context(None, "overview"))
+
+    categories = conn.execute(
+        "SELECT name, target, rule_type FROM categories WHERE credential_id = ?", (credential_id,)
+    ).fetchall()
+    conn.close()
+
+    cycle_years = ""
+    if row["cycle_start_date"] and row["cycle_end_date"]:
+        years = date.fromisoformat(row["cycle_end_date"]).year - date.fromisoformat(row["cycle_start_date"]).year
+        cycle_years = str(years) if years else ""
+
+    selected_id = credential_id if not row["archived"] else request.args.get("selected")
+    context = _body_context(selected_id, request.args.get("tab", "overview"))
+    context["credential_form_view"] = True
+    context["credential_form_mode"] = "edit"
+    context["credential_form_id"] = credential_id
+    context["credential_form_values"] = {
+        "name": row["name"],
+        "issuer": row["issuer"],
+        "member_id": row["member_id"] or "",
+        "renewal_type": row["renewal_type"],
+        "cycle_start_date": row["cycle_start_date"] or "",
+        "cycle_years": cycle_years,
+        "unit": row["unit"] or "hours",
+        "total": "" if row["total"] is None else f"{row['total']:g}",
+        "reporting_calendar": row["reporting_calendar"] or "cycle_anniversary",
+        "annual_minimum_type": row["annual_minimum_type"] or "",
+        "annual_minimum": "" if row["annual_minimum"] is None else f"{row['annual_minimum']:g}",
+        "cycle_end_date": row["cycle_end_date"] or "",
+        "note": row["note"] or "",
+        "badge_platform": row["badge_platform"] or "",
+        "badge_url": row["badge_url"] or "",
+    }
+    context["credential_form_categories"] = [dict(c) for c in categories]
+    return render_template("partials/body.html", **context)
+
+
+@bp.route("/credentials/<credential_id>/edit", methods=["POST"])
+def update_credential(credential_id):
+    tab = request.args.get("tab", "overview")
+    values, parsed, errors = _parse_credential_form(request.form)
+
+    if errors:
+        context = _body_context(credential_id, tab)
+        context["credential_form_view"] = True
+        context["credential_form_mode"] = "edit"
+        context["credential_form_id"] = credential_id
+        context["credential_form_values"] = values
+        context["credential_form_categories"] = parsed["category_rows"]
+        context["credential_form_errors"] = errors
+        return render_template("partials/body.html", **context)
+
+    badge_platform = values["badge_platform"] or None
+    badge_url = values["badge_url"] or None
+
+    conn = get_db()
+    conn.execute(
+        "UPDATE credentials SET name=?, issuer=?, member_id=?, renewal_type=?, cycle_start_date=?, cycle_end_date=?, "
+        "reporting_calendar=?, unit=?, total=?, annual_minimum=?, annual_minimum_type=?, note=?, "
+        "badge_platform=?, badge_url=?, badge_visibility=? WHERE id=?",
+        (
+            values["name"], values["issuer"], values["member_id"] or None, parsed["renewal_type"], parsed["cycle_start_date"],
+            parsed["cycle_end_date"], parsed["reporting_calendar"], parsed["unit"], parsed["total"],
+            parsed["annual_minimum"], parsed["annual_minimum_type"], values["note"] or None,
+            badge_platform, badge_url, _derive_badge_visibility(badge_platform, badge_url),
+            credential_id,
+        ),
+    )
+    conn.execute("DELETE FROM categories WHERE credential_id = ?", (credential_id,))
+    for cat in parsed["category_rows"]:
+        conn.execute(
+            "INSERT INTO categories (credential_id, name, earned, target, rule_type) VALUES (?,?,0,?,?)",
+            (credential_id, cat["name"], cat["target"], cat["rule_type"]),
+        )
+    conn.commit()
+    conn.close()
+
+    return render_template("partials/body.html", **_body_context(credential_id, tab))
+
+
 @bp.route("/credentials/<credential_id>/badge/edit")
 def edit_badge_form(credential_id):
     tab = request.args.get("tab", "overview")
@@ -191,7 +497,7 @@ def update_badge(credential_id):
 
     platform = values["badge_platform"] or None
     url = values["badge_url"] or None
-    visibility = "public" if url else ("private" if platform else None)
+    visibility = _derive_badge_visibility(platform, url)
 
     conn = get_db()
     conn.execute(
@@ -244,6 +550,36 @@ def unarchive_credential(credential_id):
     conn.close()
 
     return render_template("partials/body.html", **_body_context(credential_id, "overview"))
+
+
+@bp.route("/credentials/<credential_id>/export.csv")
+def export_activities_csv(credential_id):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM credentials WHERE id = ?", (credential_id,)).fetchone()
+    if not row:
+        conn.close()
+        return render_template("partials/body.html", **_body_context(None, "overview"))
+
+    activities = conn.execute(
+        "SELECT * FROM activities WHERE ',' || applies || ',' LIKE '%,' || ? || ',%' ORDER BY date", (credential_id,)
+    ).fetchall()
+    conn.close()
+
+    start, end = row["cycle_start_date"], row["cycle_end_date"]
+    in_cycle = [a for a in activities if (not start or a["date"] >= start) and (not end or a["date"] <= end)]
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["Date", "Provider", "Title", "Hours", "Category", "Applies To", "Status"])
+    for a in in_cycle:
+        writer.writerow([a["date"], a["provider"] or "", a["title"], a["hours"], a["category"] or "", a["applies"], a["status"]])
+
+    filename = f"{row['id']}-activities-{date.today().isoformat()}.csv"
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @bp.route("/pending/<pending_id>/approve", methods=["POST"])
