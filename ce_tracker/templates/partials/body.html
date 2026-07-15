@@ -1,6 +1,9 @@
 <div class="app-shell">
   <aside class="sidebar">
     <div class="sidebar-title">CE Tracker</div>
+    <button class="add-training-btn"
+            hx-get="{{ url_for('main.new_activity_form', selected=credential.id if credential else '') }}"
+            hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">+ Add Training</button>
     <button class="add-credential-btn"
             hx-get="{{ url_for('main.new_credential_form') }}"
             hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">+ Add Credential</button>
@@ -440,7 +443,7 @@
         <div class="reports-copy">Generate an itemized record for {{ credential.name }} covering the current cycle ({{ credential.cycle_label }}) — {{ credential.earned_label }}.</div>
         <div class="reports-actions">
           <a class="btn-primary" href="{{ url_for('main.export_activities_csv', credential_id=credential.id) }}">Export CSV</a>
-          <button class="btn-secondary" disabled title="Not implemented yet">Export PDF</button>
+          <a class="btn-secondary" href="{{ url_for('main.export_activities_pdf', credential_id=credential.id) }}">Export PDF</a>
         </div>
       {% endif %}
     </div>

@@ -34,6 +34,16 @@ html, body {
   overflow-y: auto;
 }
 .sidebar-title { padding: 0 20px 18px; font: 700 15px -apple-system, sans-serif; letter-spacing: -.2px; }
+.add-training-btn {
+  display: block; width: calc(100% - 40px);
+  margin: 0 20px 10px; padding: 12px 14px;
+  border: none; border-radius: 8px;
+  background: #2a6fd6; color: #fff; cursor: pointer;
+  font: 700 13.5px -apple-system, sans-serif; text-align: left;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+}
+.add-training-btn:hover { background: #3a7de0; }
+
 .add-credential-btn {
   margin: 0 20px 16px; padding: 8px 12px;
   border: 1px solid rgba(255, 255, 255, .16); border-radius: 7px;

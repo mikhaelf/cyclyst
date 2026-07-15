@@ -5,7 +5,7 @@ from datetime import date
 
 from flask import Blueprint, Response, render_template, request
 
-from . import views
+from . import progress, reports, views
 from .db import get_db
 from .docs_content import DOCS_SECTIONS
 
@@ -552,21 +552,32 @@ def unarchive_credential(credential_id):
     return render_template("partials/body.html", **_body_context(credential_id, "overview"))
 
 
-@bp.route("/credentials/<credential_id>/export.csv")
-def export_activities_csv(credential_id):
-    conn = get_db()
+def _credential_and_in_cycle_activities(conn, credential_id):
+    """Returns (row, categories, all_applicable_activities, in_cycle_activities) or
+    (None, None, None, None) if the credential doesn't exist. Shared by both export routes."""
     row = conn.execute("SELECT * FROM credentials WHERE id = ?", (credential_id,)).fetchone()
     if not row:
-        conn.close()
-        return render_template("partials/body.html", **_body_context(None, "overview"))
+        return None, None, None, None
 
+    categories = conn.execute(
+        "SELECT name, target, rule_type FROM categories WHERE credential_id = ?", (credential_id,)
+    ).fetchall()
     activities = conn.execute(
         "SELECT * FROM activities WHERE ',' || applies || ',' LIKE '%,' || ? || ',%' ORDER BY date", (credential_id,)
     ).fetchall()
-    conn.close()
 
     start, end = row["cycle_start_date"], row["cycle_end_date"]
     in_cycle = [a for a in activities if (not start or a["date"] >= start) and (not end or a["date"] <= end)]
+    return row, categories, activities, in_cycle
+
+
+@bp.route("/credentials/<credential_id>/export.csv")
+def export_activities_csv(credential_id):
+    conn = get_db()
+    row, _categories, _activities, in_cycle = _credential_and_in_cycle_activities(conn, credential_id)
+    conn.close()
+    if not row:
+        return render_template("partials/body.html", **_body_context(None, "overview"))
 
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -578,6 +589,25 @@ def export_activities_csv(credential_id):
     return Response(
         buf.getvalue(),
         mimetype="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@bp.route("/credentials/<credential_id>/export.pdf")
+def export_activities_pdf(credential_id):
+    conn = get_db()
+    row, categories, activities, in_cycle = _credential_and_in_cycle_activities(conn, credential_id)
+    conn.close()
+    if not row:
+        return render_template("partials/body.html", **_body_context(None, "overview"))
+
+    prog = progress.compute_progress(row, activities, categories)
+    pdf_bytes = reports.build_activity_report_pdf(row, in_cycle, prog["category_results"], prog["earned"] or 0)
+
+    filename = f"{row['id']}-report-{date.today().isoformat()}.pdf"
+    return Response(
+        pdf_bytes,
+        mimetype="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
