@@ -263,6 +263,9 @@ html, body {
   gap: 16px;
 }
 .activity-row > div:first-child { flex: 1; min-width: 0; }
+.activity-clickable { cursor: pointer; border-radius: 6px; margin: -4px -6px; padding: 4px 6px; }
+.activity-clickable:hover { background: #f7f8fa; }
+.activity-clickable:hover .activity-title { color: #2a6fd6; }
 .activity-title { font: 600 13px -apple-system, sans-serif; color: #161a23; }
 .activity-meta { font: 11.5px -apple-system, sans-serif; color: #98a2b3; margin-top: 2px; }
 .activity-right { flex: none; min-width: 64px; text-align: right; }
@@ -283,7 +286,9 @@ html, body {
 }
 .pending-title { font: 600 13px -apple-system, sans-serif; color: #161a23; }
 .pending-meta { font: 11.5px -apple-system, sans-serif; color: #98a2b3; margin-top: 2px; }
+.pending-applies { font: 11px -apple-system, sans-serif; color: #667085; margin-top: 3px; }
 .pending-flag { font: 11px -apple-system, sans-serif; color: #b54708; margin-top: 4px; }
+.pending-flag.pending-duplicate { color: #c1440e; }
 .pending-actions { display: flex; gap: 6px; flex: none; }
 .approvebtn {
   border: none; font: 600 11.5px -apple-system, sans-serif;

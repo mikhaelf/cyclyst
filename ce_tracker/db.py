@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS activities (
 );
 
 CREATE TABLE IF NOT EXISTS pending_activities (
-    id TEXT PRIMARY KEY,
+    id TEXT PRIMARY KEY, -- calendar-sourced rows use 'cal:{google_event_id}' so re-scans dedup for free
     date TEXT NOT NULL,
     provider TEXT,
     title TEXT NOT NULL,
@@ -77,7 +77,19 @@ CREATE TABLE IF NOT EXISTS pending_activities (
     applies TEXT NOT NULL DEFAULT '', -- comma-separated credential ids
     source TEXT,
     flagged INTEGER NOT NULL DEFAULT 0,
-    status TEXT NOT NULL DEFAULT 'pending' -- 'pending' | 'approved' | 'dismissed'
+    status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'approved' | 'dismissed'
+    category TEXT,
+    duplicate_of TEXT, -- e.g. 'activity:15' or 'cal:...' — a likely-duplicate match found at staging time
+    duplicate_confidence REAL -- 0-1 score; NULL = no duplicate check matched anything
+);
+
+CREATE TABLE IF NOT EXISTS calendar_ingest_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_at TEXT NOT NULL,
+    window_start TEXT NOT NULL,
+    window_end TEXT NOT NULL,
+    events_seen INTEGER,
+    candidates_staged INTEGER
 );
 """
 
@@ -241,6 +253,21 @@ def _migrate_manual_adjustment_columns(conn):
         conn.execute("ALTER TABLE categories ADD COLUMN manual_adjustment REAL")
 
 
+def _migrate_pending_activity_columns(conn):
+    """Adds the fields calendar (and any future) ingestion needs: `category` so a staged row
+    can carry a real category through the review-before-approve form (see routes.py's
+    review_pending_form), and `duplicate_of`/`duplicate_confidence` for cross-source duplicate
+    detection (e.g. a calendar event that looks like the same real-world activity as one
+    already manually logged) — see ce_tracker/calendar_ingest.py."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(pending_activities)")}
+    if "category" not in cols:
+        conn.execute("ALTER TABLE pending_activities ADD COLUMN category TEXT")
+    if "duplicate_of" not in cols:
+        conn.execute("ALTER TABLE pending_activities ADD COLUMN duplicate_of TEXT")
+    if "duplicate_confidence" not in cols:
+        conn.execute("ALTER TABLE pending_activities ADD COLUMN duplicate_confidence REAL")
+
+
 def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = get_db()
@@ -251,6 +278,7 @@ def init_db():
     _migrate_category_parent_column(conn)
     _migrate_grace_period_backfill(conn)
     _migrate_manual_adjustment_columns(conn)
+    _migrate_pending_activity_columns(conn)
     conn.commit()
     conn.close()
 

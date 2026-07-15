@@ -212,22 +212,47 @@ def archived_credentials(conn):
     return [dict(r) for r in rows]
 
 
+def _duplicate_label(conn, duplicate_of):
+    """duplicate_of is 'activity:<id>' or 'cal:<pending_activities.id>' — resolve it to a short
+    human-readable description for the "possible duplicate of X" callout."""
+    if not duplicate_of or ":" not in duplicate_of:
+        return None
+    kind, ref_id = duplicate_of.split(":", 1)
+    if kind == "activity":
+        row = conn.execute("SELECT title, date, provider FROM activities WHERE id = ?", (ref_id,)).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT title, date, provider FROM pending_activities WHERE id = ?", (duplicate_of,)
+        ).fetchone()
+    if not row:
+        return None
+    bits = [row["title"], row["date"]]
+    if row["provider"]:
+        bits.append(row["provider"])
+    return " · ".join(bits)
+
+
 def pending_view(conn):
     rows = conn.execute(
         "SELECT * FROM pending_activities WHERE status = 'pending' ORDER BY date DESC"
     ).fetchall()
-    return [
-        {
+    result = []
+    for row in rows:
+        duplicate_confidence = row["duplicate_confidence"]
+        result.append({
             "id": row["id"],
             "date": row["date"],
             "provider": row["provider"],
             "title": row["title"],
             "hours_guess": row["hours_guess"],
+            "category": row["category"],
+            "applies": row["applies"].split(",") if row["applies"] else [],
             "source": row["source"],
             "flagged": bool(row["flagged"]),
-        }
-        for row in rows
-    ]
+            "duplicate_pct": round(duplicate_confidence * 100) if duplicate_confidence else None,
+            "duplicate_label": _duplicate_label(conn, row["duplicate_of"]) if duplicate_confidence else None,
+        })
+    return result
 
 
 def get_credential_or_404(conn, credential_id):

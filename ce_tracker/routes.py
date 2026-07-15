@@ -35,6 +35,8 @@ def _body_context(selected_id, tab):
             ).fetchall()
         ],
         "show_add_form": False,
+        "edit_activity_id": None,
+        "review_pending_id": None,
         "form_values": {},
         "form_errors": {},
         "docs_view": False,
@@ -80,6 +82,10 @@ def _parse_activity_form(form, credential_ids):
     if not applies:
         errors["applies"] = "Select at least one credential this activity applies to."
 
+    status = form.get("status") or "logged"
+    if status not in ("logged", "submitted"):
+        status = "logged"
+
     values = {
         "date": date_value or date.today().isoformat(),
         "provider": (form.get("provider") or "").strip(),
@@ -87,6 +93,7 @@ def _parse_activity_form(form, credential_ids):
         "hours": hours_raw,
         "category": (form.get("category") or "").strip(),
         "applies": applies,
+        "status": status,
     }
     return values, errors, hours
 
@@ -337,6 +344,7 @@ def new_activity_form():
     context["form_values"] = {
         "date": date.today().isoformat(),
         "applies": [context["credential"]["id"]] if context["credential"] else [],
+        "status": "logged",
     }
     return render_template("partials/body.html", **context)
 
@@ -366,13 +374,72 @@ def create_activity():
             hours,
             values["category"] or None,
             ",".join(values["applies"]),
-            "logged",
+            values["status"],
         ),
     )
     conn.commit()
     conn.close()
 
     # rebuild context so the new row shows up in the (freshly queried) activity list
+    return render_template("partials/body.html", **_body_context(selected_id, "activity"))
+
+
+@bp.route("/activities/<int:activity_id>/edit")
+def edit_activity_form(activity_id):
+    selected_id = request.args.get("selected")
+    conn = get_db()
+    row = conn.execute("SELECT * FROM activities WHERE id = ?", (activity_id,)).fetchone()
+    conn.close()
+    if not row:
+        return render_template("partials/body.html", **_body_context(selected_id, "activity"))
+
+    context = _body_context(selected_id, "activity")
+    context["show_add_form"] = True
+    context["edit_activity_id"] = activity_id
+    context["form_values"] = {
+        "date": row["date"],
+        "provider": row["provider"] or "",
+        "title": row["title"],
+        "hours": f"{row['hours']:g}",
+        "category": row["category"] or "",
+        "applies": row["applies"].split(",") if row["applies"] else [],
+        "status": row["status"],
+    }
+    return render_template("partials/body.html", **context)
+
+
+@bp.route("/activities/<int:activity_id>/edit", methods=["POST"])
+def update_activity(activity_id):
+    selected_id = request.args.get("selected")
+    context = _body_context(selected_id, "activity")
+    credential_ids = {c["id"] for c in context["all_credentials"]}
+
+    values, errors, hours = _parse_activity_form(request.form, credential_ids)
+
+    if errors:
+        context["show_add_form"] = True
+        context["edit_activity_id"] = activity_id
+        context["form_values"] = values
+        context["form_errors"] = errors
+        return render_template("partials/body.html", **context)
+
+    conn = get_db()
+    conn.execute(
+        "UPDATE activities SET date=?, provider=?, title=?, hours=?, category=?, applies=?, status=? WHERE id=?",
+        (
+            values["date"],
+            values["provider"] or None,
+            values["title"],
+            hours,
+            values["category"] or None,
+            ",".join(values["applies"]),
+            values["status"],
+            activity_id,
+        ),
+    )
+    conn.commit()
+    conn.close()
+
     return render_template("partials/body.html", **_body_context(selected_id, "activity"))
 
 
@@ -687,26 +754,77 @@ def export_activities_pdf(credential_id):
     )
 
 
-@bp.route("/pending/<pending_id>/approve", methods=["POST"])
-def approve_pending(pending_id):
+@bp.route("/pending/<pending_id>/review")
+def review_pending_form(pending_id):
+    """Opens a pre-filled Activity form for a pending item instead of committing it blindly —
+    mirrors edit_activity_form's pattern. hours_guess/category/applies are candidate guesses,
+    not confirmed facts, so the human reviews (and can correct) them before anything becomes a
+    permanent activities row."""
     selected_id = request.args.get("selected")
-    tab = request.args.get("tab", "pending")
-
     conn = get_db()
     item = conn.execute(
         "SELECT * FROM pending_activities WHERE id = ? AND status = 'pending'", (pending_id,)
+    ).fetchone()
+    conn.close()
+    if not item:
+        return render_template("partials/body.html", **_body_context(selected_id, "pending"))
+
+    # Renders under the 'activity' tab — that's where the shared Add/Edit Activity form block
+    # lives in the template; the review form is mechanically the same form, just pre-filled
+    # from a pending candidate instead of blank or an existing activities row.
+    context = _body_context(selected_id, "activity")
+    context["show_add_form"] = True
+    context["review_pending_id"] = pending_id
+    context["form_values"] = {
+        "date": item["date"],
+        "provider": item["provider"] or "",
+        "title": item["title"],
+        "hours": "" if item["hours_guess"] is None else f"{item['hours_guess']:g}",
+        "category": item["category"] or "",
+        "applies": item["applies"].split(",") if item["applies"] else [],
+        "status": "logged",
+    }
+    return render_template("partials/body.html", **context)
+
+
+@bp.route("/pending/<pending_id>/review", methods=["POST"])
+def approve_pending_reviewed(pending_id):
+    selected_id = request.args.get("selected")
+    context = _body_context(selected_id, "activity")
+    credential_ids = {c["id"] for c in context["all_credentials"]}
+
+    values, errors, hours = _parse_activity_form(request.form, credential_ids)
+
+    if errors:
+        context["show_add_form"] = True
+        context["review_pending_id"] = pending_id
+        context["form_values"] = values
+        context["form_errors"] = errors
+        return render_template("partials/body.html", **context)
+
+    conn = get_db()
+    item = conn.execute(
+        "SELECT id FROM pending_activities WHERE id = ? AND status = 'pending'", (pending_id,)
     ).fetchone()
     if item:
         conn.execute(
             "INSERT INTO activities (date, provider, title, hours, category, applies, status) "
             "VALUES (?,?,?,?,?,?,?)",
-            (item["date"], item["provider"], item["title"], item["hours_guess"] or 0, None, item["applies"], "logged"),
+            (
+                values["date"],
+                values["provider"] or None,
+                values["title"],
+                hours,
+                values["category"] or None,
+                ",".join(values["applies"]),
+                values["status"],
+            ),
         )
         conn.execute("UPDATE pending_activities SET status = 'approved' WHERE id = ?", (pending_id,))
         conn.commit()
     conn.close()
 
-    return render_template("partials/body.html", **_body_context(selected_id, tab))
+    return render_template("partials/body.html", **_body_context(selected_id, "pending"))
 
 
 @bp.route("/pending/<pending_id>/dismiss", methods=["POST"])

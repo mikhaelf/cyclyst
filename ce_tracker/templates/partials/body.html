@@ -364,7 +364,7 @@
 
         {% if show_add_form %}
         <form class="add-activity-form"
-              hx-post="{{ url_for('main.create_activity', selected=credential.id) }}"
+              hx-post="{{ url_for('main.approve_pending_reviewed', pending_id=review_pending_id, selected=credential.id) if review_pending_id else (url_for('main.update_activity', activity_id=edit_activity_id, selected=credential.id) if edit_activity_id else url_for('main.create_activity', selected=credential.id)) }}"
               hx-target="#app-body" hx-swap="innerHTML">
           <div class="form-row">
             <label>Date
@@ -394,6 +394,13 @@
             {% for opt in category_options %}<option value="{{ opt }}">{% endfor %}
           </datalist>
 
+          <label>Status
+            <select name="status">
+              <option value="logged" {% if form_values.get('status', 'logged') == 'logged' %}selected{% endif %}>Logged, not yet filed</option>
+              <option value="submitted" {% if form_values.get('status') == 'submitted' %}selected{% endif %}>Submitted</option>
+            </select>
+          </label>
+
           <div class="form-applies">
             <div class="form-applies-label">Applies to</div>
             {% for c in all_credentials %}
@@ -406,9 +413,9 @@
           {% if form_errors.get('applies') %}<div class="form-error">{{ form_errors['applies'] }}</div>{% endif %}
 
           <div class="form-actions">
-            <button type="submit" class="btn-primary">Save Activity</button>
+            <button type="submit" class="btn-primary">{{ 'Approve into Activity Log' if review_pending_id else ('Save Changes' if edit_activity_id else 'Save Activity') }}</button>
             <button type="button" class="btn-secondary"
-                    hx-get="{{ url_for('main.view_fragment', selected=credential.id, tab='activity') }}"
+                    hx-get="{{ url_for('main.view_fragment', selected=credential.id, tab='pending' if review_pending_id else 'activity') }}"
                     hx-target="#app-body" hx-swap="innerHTML">Cancel</button>
           </div>
         </form>
@@ -417,7 +424,9 @@
         {% if credential.activities %}
           {% for a in credential.activities %}
           <div class="activity-row">
-            <div>
+            <div class="activity-clickable"
+                 hx-get="{{ url_for('main.edit_activity_form', activity_id=a.id, selected=credential.id) }}"
+                 hx-target="#app-body" hx-swap="innerHTML">
               <div class="activity-title">{{ a.title }}</div>
               <div class="activity-meta">{{ a.provider }} · {{ a.date }} · {{ a.category }}</div>
             </div>
@@ -441,13 +450,15 @@
           <div class="pending-card">
             <div>
               <div class="pending-title">{{ p.title }}</div>
-              <div class="pending-meta">{{ p.provider }} · {{ p.date }} · via {{ p.source }} · ~{{ p.hours_guess }}h</div>
+              <div class="pending-meta">{{ p.provider }} · {{ p.date }} · via {{ p.source }} · ~{{ p.hours_guess }}h{% if p.category %} · {{ p.category }}{% endif %}</div>
+              {% if p.applies %}<div class="pending-applies">Applies to: {{ p.applies|join(', ') }}</div>{% endif %}
               {% if p.flagged %}<div class="pending-flag">⚠ low-confidence match — verify before approving</div>{% endif %}
+              {% if p.duplicate_pct %}<div class="pending-flag pending-duplicate">⚠ {{ p.duplicate_pct }}% likely duplicate of "{{ p.duplicate_label }}"</div>{% endif %}
             </div>
             <div class="pending-actions">
               <button class="approvebtn approve"
-                      hx-post="{{ url_for('main.approve_pending', pending_id=p.id, selected=credential.id, tab='pending') }}"
-                      hx-target="#app-body" hx-swap="innerHTML">Approve</button>
+                      hx-get="{{ url_for('main.review_pending_form', pending_id=p.id, selected=credential.id) }}"
+                      hx-target="#app-body" hx-swap="innerHTML">Review & Approve</button>
               <button class="approvebtn dismiss"
                       hx-post="{{ url_for('main.dismiss_pending', pending_id=p.id, selected=credential.id, tab='pending') }}"
                       hx-target="#app-body" hx-swap="innerHTML">Dismiss</button>
