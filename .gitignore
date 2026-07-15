@@ -1,0 +1,9 @@
+CLAUDE.local.md
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# local data (private, per CLAUDE.md hard constraints)
+data/*.db

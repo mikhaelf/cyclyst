@@ -1,0 +1,200 @@
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="sidebar-title">CE Tracker</div>
+    <div class="cred-list">
+      {% for c in sidebar %}
+      <div class="credrow {{ 'active' if credential and credential.id == c.id else '' }}"
+           hx-get="{{ url_for('main.view_fragment', selected=c.id, tab='overview') }}"
+           hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">
+        <div class="credrow-top">
+          <span class="credrow-name">{{ c.name }}</span>
+          <span class="status-dot" style="background:{{ c.status_color }}"></span>
+        </div>
+        <div class="credrow-sub">{{ c.issuer }} · {{ c.pct_label }}</div>
+        <div class="mini-bar"><div class="mini-bar-fill" style="width:{{ c.bar_width }}%;background:{{ c.status_color }}"></div></div>
+      </div>
+      {% endfor %}
+    </div>
+    {% if archived %}
+    <div class="archived-label">Archived</div>
+    {% for c in archived %}
+    <div class="archived-row">
+      <div class="archived-name">{{ c.name }}</div>
+      <div class="archived-sub">{{ c.issuer }} · {{ c.retired_label }}</div>
+    </div>
+    {% endfor %}
+    {% endif %}
+  </aside>
+
+  <main class="detail-panel">
+    {% if credential %}
+    <div class="detail-header">
+      <div>
+        <div class="detail-name">{{ credential.name }}</div>
+        <div class="detail-sub">{{ credential.issuer }} · {{ credential.cycle_label }}</div>
+      </div>
+      <div class="detail-status">
+        <div class="status-label" style="color:{{ credential.status_color }}">{{ credential.status_label }}</div>
+        <div class="days-label">{{ credential.days_label }}</div>
+        {% if credential.badge_platform %}
+          {% if credential.badge_is_public %}
+          <a class="badgechip public" href="{{ credential.badge_url }}" target="_blank" rel="noopener">{{ credential.badge_label }}</a>
+          {% else %}
+          <span class="badgechip private">{{ credential.badge_label }}</span>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tabbtn {{ 'active' if tab == 'overview' else '' }}"
+              hx-get="{{ url_for('main.view_fragment', selected=credential.id, tab='overview') }}"
+              hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">Overview</button>
+      <button class="tabbtn {{ 'active' if tab == 'activity' else '' }}"
+              hx-get="{{ url_for('main.view_fragment', selected=credential.id, tab='activity') }}"
+              hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">Activity Log</button>
+      <button class="tabbtn {{ 'active' if tab == 'pending' else '' }}"
+              hx-get="{{ url_for('main.view_fragment', selected=credential.id, tab='pending') }}"
+              hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">Pending Review{% if pending %} ({{ pending|length }}){% endif %}</button>
+      <button class="tabbtn {{ 'active' if tab == 'reports' else '' }}"
+              hx-get="{{ url_for('main.view_fragment', selected=credential.id, tab='reports') }}"
+              hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">Reports</button>
+    </div>
+
+    <div class="tab-content">
+      {% if tab == 'overview' %}
+        <div class="overview-top">
+          <div class="ring" style="background:{{ credential.ring_gradient }}">
+            <div class="ring-inner">
+              <div class="ring-pct">{{ credential.pct_label }}</div>
+              <div class="ring-caption">of cycle</div>
+            </div>
+          </div>
+          <div class="overview-meta">
+            <div class="earned-label">{{ credential.earned_label }}</div>
+            {% if credential.annual_label %}<div class="annual-label">{{ credential.annual_label }}</div>{% endif %}
+            {% if credential.note %}<div class="note-callout">⚠ {{ credential.note }}</div>{% endif %}
+          </div>
+        </div>
+        {% if credential.categories %}
+        <div class="categories">
+          {% for cat in credential.categories %}
+          <div class="category-row">
+            <div class="category-label">{{ cat.label }}</div>
+            <div class="category-bar"><div class="category-bar-fill" style="width:{{ cat.pct }}%;background:{{ cat.bar_color }}"></div></div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+      {% elif tab == 'activity' %}
+        <div class="activity-toolbar">
+          {% if not show_add_form %}
+          <button class="btn-secondary"
+                  hx-get="{{ url_for('main.new_activity_form', selected=credential.id) }}"
+                  hx-target="#app-body" hx-swap="innerHTML">+ Add Activity</button>
+          {% endif %}
+        </div>
+
+        {% if show_add_form %}
+        <form class="add-activity-form"
+              hx-post="{{ url_for('main.create_activity', selected=credential.id) }}"
+              hx-target="#app-body" hx-swap="innerHTML">
+          <div class="form-row">
+            <label>Date
+              <input type="date" name="date" value="{{ form_values.get('date', '') }}">
+            </label>
+            <label>Hours
+              <input type="text" name="hours" value="{{ form_values.get('hours', '') }}" placeholder="e.g. 2.5">
+            </label>
+          </div>
+          {% if form_errors.get('date') %}<div class="form-error">{{ form_errors['date'] }}</div>{% endif %}
+          {% if form_errors.get('hours') %}<div class="form-error">{{ form_errors['hours'] }}</div>{% endif %}
+
+          <label>Title
+            <input type="text" name="title" value="{{ form_values.get('title', '') }}" placeholder="e.g. AI Governance Symposium">
+          </label>
+          {% if form_errors.get('title') %}<div class="form-error">{{ form_errors['title'] }}</div>{% endif %}
+
+          <div class="form-row">
+            <label>Provider
+              <input type="text" name="provider" value="{{ form_values.get('provider', '') }}" placeholder="e.g. Northbridge Learning">
+            </label>
+            <label>Category
+              <input type="text" name="category" value="{{ form_values.get('category', '') }}" placeholder="e.g. Technical">
+            </label>
+          </div>
+
+          <div class="form-applies">
+            <div class="form-applies-label">Applies to</div>
+            {% for c in all_credentials %}
+            <label class="applies-checkbox">
+              <input type="checkbox" name="applies" value="{{ c.id }}" {% if c.id in form_values.get('applies', []) %}checked{% endif %}>
+              {{ c.name }}
+            </label>
+            {% endfor %}
+          </div>
+          {% if form_errors.get('applies') %}<div class="form-error">{{ form_errors['applies'] }}</div>{% endif %}
+
+          <div class="form-actions">
+            <button type="submit" class="btn-primary">Save Activity</button>
+            <button type="button" class="btn-secondary"
+                    hx-get="{{ url_for('main.view_fragment', selected=credential.id, tab='activity') }}"
+                    hx-target="#app-body" hx-swap="innerHTML">Cancel</button>
+          </div>
+        </form>
+        {% endif %}
+
+        {% if credential.activities %}
+          {% for a in credential.activities %}
+          <div class="activity-row">
+            <div>
+              <div class="activity-title">{{ a.title }}</div>
+              <div class="activity-meta">{{ a.provider }} · {{ a.date }} · {{ a.category }}</div>
+            </div>
+            <div class="activity-right">
+              <div class="activity-hours">{{ a.hours_label }}</div>
+              <div class="activity-status" style="color:{{ a.status_color }}">{{ a.status_label }}</div>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-state">No activities logged yet for this credential.</div>
+        {% endif %}
+
+      {% elif tab == 'pending' %}
+        {% if pending %}
+          {% for p in pending %}
+          <div class="pending-card">
+            <div>
+              <div class="pending-title">{{ p.title }}</div>
+              <div class="pending-meta">{{ p.provider }} · {{ p.date }} · via {{ p.source }} · ~{{ p.hours_guess }}h</div>
+              {% if p.flagged %}<div class="pending-flag">⚠ low-confidence match — verify before approving</div>{% endif %}
+            </div>
+            <div class="pending-actions">
+              <button class="approvebtn approve"
+                      hx-post="{{ url_for('main.approve_pending', pending_id=p.id, selected=credential.id, tab='pending') }}"
+                      hx-target="#app-body" hx-swap="innerHTML">Approve</button>
+              <button class="approvebtn dismiss"
+                      hx-post="{{ url_for('main.dismiss_pending', pending_id=p.id, selected=credential.id, tab='pending') }}"
+                      hx-target="#app-body" hx-swap="innerHTML">Dismiss</button>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-state">No pending items to review.</div>
+        {% endif %}
+
+      {% elif tab == 'reports' %}
+        <div class="reports-copy">Generate an itemized record for {{ credential.name }} covering the current cycle ({{ credential.cycle_label }}) — {{ credential.earned_label }}.</div>
+        <div class="reports-actions">
+          <button class="btn-primary" disabled title="Not implemented yet">Export Markdown/PDF</button>
+          <button class="btn-secondary" disabled title="Not implemented yet">Export CSV (issuer format)</button>
+        </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="empty-state">No credentials yet.</div>
+    {% endif %}
+  </main>
+</div>
