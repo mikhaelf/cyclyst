@@ -4,6 +4,7 @@ from flask import Blueprint, render_template, request
 
 from . import views
 from .db import get_db
+from .docs_content import DOCS_SECTIONS
 
 bp = Blueprint("main", __name__)
 
@@ -27,6 +28,13 @@ def _body_context(selected_id, tab):
         "show_add_form": False,
         "form_values": {},
         "form_errors": {},
+        "docs_view": False,
+        "docs_sections": [],
+        "show_badge_form": False,
+        "badge_form_values": {},
+        "badge_form_errors": {},
+        "status_legend": views.STATUS_LEGEND,
+        "show_archive_form": False,
     }
     conn.close()
     return context
@@ -68,6 +76,21 @@ def _parse_activity_form(form, credential_ids):
     return values, errors, hours
 
 
+def _parse_badge_form(form):
+    """Validate the optional public-credential-link form. Returns (values_for_redisplay, errors)."""
+    errors = {}
+
+    platform = (form.get("badge_platform") or "").strip()
+    url = (form.get("badge_url") or "").strip()
+
+    if url and not (url.startswith("http://") or url.startswith("https://")):
+        errors["badge_url"] = "Enter a full URL starting with http:// or https://."
+    if url and not platform:
+        errors["badge_platform"] = "Add a platform name (e.g. Credly) so the link can be labeled."
+
+    return {"badge_platform": platform, "badge_url": url}, errors
+
+
 @bp.route("/")
 def index():
     selected_id = request.args.get("selected")
@@ -80,6 +103,16 @@ def view_fragment():
     selected_id = request.args.get("selected")
     tab = request.args.get("tab", "overview")
     return render_template("partials/body.html", **_body_context(selected_id, tab))
+
+
+@bp.route("/docs")
+def docs_fragment():
+    selected_id = request.args.get("selected")
+    tab = request.args.get("tab", "overview")
+    context = _body_context(selected_id, tab)
+    context["docs_view"] = True
+    context["docs_sections"] = DOCS_SECTIONS
+    return render_template("partials/body.html", **context)
 
 
 @bp.route("/activities/new")
@@ -127,6 +160,90 @@ def create_activity():
 
     # rebuild context so the new row shows up in the (freshly queried) activity list
     return render_template("partials/body.html", **_body_context(selected_id, "activity"))
+
+
+@bp.route("/credentials/<credential_id>/badge/edit")
+def edit_badge_form(credential_id):
+    tab = request.args.get("tab", "overview")
+    context = _body_context(credential_id, tab)
+    if not context["credential"]:
+        return render_template("partials/body.html", **context)
+
+    context["show_badge_form"] = True
+    context["badge_form_values"] = {
+        "badge_platform": context["credential"]["badge_platform"] or "",
+        "badge_url": context["credential"]["badge_url"] or "",
+    }
+    return render_template("partials/body.html", **context)
+
+
+@bp.route("/credentials/<credential_id>/badge", methods=["POST"])
+def update_badge(credential_id):
+    tab = request.args.get("tab", "overview")
+    values, errors = _parse_badge_form(request.form)
+
+    if errors:
+        context = _body_context(credential_id, tab)
+        context["show_badge_form"] = True
+        context["badge_form_values"] = values
+        context["badge_form_errors"] = errors
+        return render_template("partials/body.html", **context)
+
+    platform = values["badge_platform"] or None
+    url = values["badge_url"] or None
+    visibility = "public" if url else ("private" if platform else None)
+
+    conn = get_db()
+    conn.execute(
+        "UPDATE credentials SET badge_platform = ?, badge_url = ?, badge_visibility = ? WHERE id = ?",
+        (platform, url, visibility, credential_id),
+    )
+    conn.commit()
+    conn.close()
+
+    return render_template("partials/body.html", **_body_context(credential_id, tab))
+
+
+@bp.route("/credentials/<credential_id>/archive/edit")
+def archive_form(credential_id):
+    tab = request.args.get("tab", "overview")
+    context = _body_context(credential_id, tab)
+    if not context["credential"]:
+        return render_template("partials/body.html", **context)
+
+    context["show_archive_form"] = True
+    return render_template("partials/body.html", **context)
+
+
+@bp.route("/credentials/<credential_id>/archive", methods=["POST"])
+def archive_credential(credential_id):
+    retired_label = (request.form.get("retired_label") or "").strip()
+    if not retired_label:
+        retired_label = f"Archived {date.today().isoformat()}"
+
+    conn = get_db()
+    conn.execute(
+        "UPDATE credentials SET archived = 1, retired_label = ? WHERE id = ?",
+        (retired_label, credential_id),
+    )
+    conn.commit()
+    conn.close()
+
+    # deselect the now-archived credential so the sidebar falls back to the next active one
+    return render_template("partials/body.html", **_body_context(None, "overview"))
+
+
+@bp.route("/credentials/<credential_id>/unarchive", methods=["POST"])
+def unarchive_credential(credential_id):
+    conn = get_db()
+    conn.execute(
+        "UPDATE credentials SET archived = 0, retired_label = NULL WHERE id = ?",
+        (credential_id,),
+    )
+    conn.commit()
+    conn.close()
+
+    return render_template("partials/body.html", **_body_context(credential_id, "overview"))
 
 
 @bp.route("/pending/<pending_id>/approve", methods=["POST"])

@@ -21,13 +21,53 @@
     <div class="archived-row">
       <div class="archived-name">{{ c.name }}</div>
       <div class="archived-sub">{{ c.issuer }} · {{ c.retired_label }}</div>
+      <button class="unarchive-link"
+              hx-post="{{ url_for('main.unarchive_credential', credential_id=c.id) }}"
+              hx-target="#app-body" hx-swap="innerHTML">Unarchive</button>
     </div>
     {% endfor %}
     {% endif %}
+
+    <div class="status-legend">
+      <div class="legend-label">Status colors</div>
+      {% for item in status_legend %}
+      <div class="legend-item"><span class="status-dot" style="background:{{ item.color }}"></span>{{ item.label }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="sidebar-nav">
+      <div class="nav-link {{ 'active' if docs_view else '' }}"
+           hx-get="{{ url_for('main.docs_fragment', selected=credential.id if credential else '') }}"
+           hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">
+        <span class="nav-icon">📘</span> Docs
+      </div>
+    </div>
   </aside>
 
   <main class="detail-panel">
-    {% if credential %}
+    {% if docs_view %}
+    <div class="docs-panel">
+      <div class="docs-header" id="docs-top">
+        <div class="detail-name">Docs</div>
+        <div class="detail-sub">What you can do in CE Tracker, step by step.</div>
+      </div>
+
+      <nav class="docs-toc" aria-label="Docs sections">
+        <div class="docs-toc-label">On this page</div>
+        {% for s in docs_sections %}
+        <a class="docs-toc-link" href="#{{ s.id }}">{{ s.title }}</a>
+        {% endfor %}
+      </nav>
+
+      {% for s in docs_sections %}
+      <div class="docs-section" id="{{ s.id }}">
+        <div class="docs-title">{{ s.title }}</div>
+        {{ s.body | safe }}
+        {% if not loop.first %}<a class="docs-backtotop" href="#docs-top">↑ Back to top</a>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% elif credential %}
     <div class="detail-header">
       <div>
         <div class="detail-name">{{ credential.name }}</div>
@@ -36,12 +76,57 @@
       <div class="detail-status">
         <div class="status-label" style="color:{{ credential.status_color }}">{{ credential.status_label }}</div>
         <div class="days-label">{{ credential.days_label }}</div>
-        {% if credential.badge_platform %}
-          {% if credential.badge_is_public %}
-          <a class="badgechip public" href="{{ credential.badge_url }}" target="_blank" rel="noopener">{{ credential.badge_label }}</a>
-          {% else %}
-          <span class="badgechip private">{{ credential.badge_label }}</span>
+
+        {% if show_archive_form %}
+        <form class="archive-form"
+              hx-post="{{ url_for('main.archive_credential', credential_id=credential.id) }}"
+              hx-target="#app-body" hx-swap="innerHTML">
+          <div class="archive-form-copy">Archiving stops progress tracking for {{ credential.name }}. You can unarchive it later from the sidebar.</div>
+          <label>Reason (optional)
+            <input type="text" name="retired_label" placeholder="e.g. Lapsed 2026 — not renewing">
+          </label>
+          <div class="form-actions">
+            <button type="submit" class="btn-danger small">Confirm Archive</button>
+            <button type="button" class="btn-secondary small"
+                    hx-get="{{ url_for('main.view_fragment', selected=credential.id, tab=tab) }}"
+                    hx-target="#app-body" hx-swap="innerHTML">Cancel</button>
+          </div>
+        </form>
+
+        {% elif show_badge_form %}
+        <form class="badge-form"
+              hx-post="{{ url_for('main.update_badge', credential_id=credential.id, tab=tab) }}"
+              hx-target="#app-body" hx-swap="innerHTML">
+          <label>Platform
+            <input type="text" name="badge_platform" value="{{ badge_form_values.get('badge_platform', '') }}" placeholder="e.g. Credly">
+          </label>
+          {% if badge_form_errors.get('badge_platform') %}<div class="form-error">{{ badge_form_errors['badge_platform'] }}</div>{% endif %}
+          <label>Public URL
+            <input type="text" name="badge_url" value="{{ badge_form_values.get('badge_url', '') }}" placeholder="https://www.credly.com/badges/...">
+          </label>
+          {% if badge_form_errors.get('badge_url') %}<div class="form-error">{{ badge_form_errors['badge_url'] }}</div>{% endif %}
+          <div class="form-actions">
+            <button type="submit" class="btn-primary small">Save</button>
+            <button type="button" class="btn-secondary small"
+                    hx-get="{{ url_for('main.view_fragment', selected=credential.id, tab=tab) }}"
+                    hx-target="#app-body" hx-swap="innerHTML">Cancel</button>
+          </div>
+        </form>
+
+        {% else %}
+          {% if credential.badge_platform %}
+            {% if credential.badge_is_public %}
+            <a class="badgechip public" href="{{ credential.badge_url }}" target="_blank" rel="noopener">{{ credential.badge_label }}</a>
+            {% else %}
+            <span class="badgechip private">{{ credential.badge_label }}</span>
+            {% endif %}
           {% endif %}
+          <button class="badge-edit-link"
+                  hx-get="{{ url_for('main.edit_badge_form', credential_id=credential.id, tab=tab) }}"
+                  hx-target="#app-body" hx-swap="innerHTML">{{ 'Edit link' if credential.badge_platform else '+ Add public link' }}</button>
+          <button class="archive-link"
+                  hx-get="{{ url_for('main.archive_form', credential_id=credential.id, tab=tab) }}"
+                  hx-target="#app-body" hx-swap="innerHTML">Archive credential</button>
         {% endif %}
       </div>
     </div>

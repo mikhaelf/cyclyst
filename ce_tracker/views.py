@@ -7,6 +7,14 @@ STATUS_LABEL = {"on-track": "On track", "at-risk": "At risk", "reminder": "Remin
 ACT_STATUS_COLOR = {"submitted": "#1f9d7c", "logged": "#98a2b3"}
 ACT_STATUS_LABEL = {"submitted": "Submitted", "logged": "Logged, not yet filed"}
 
+# Explains the sidebar status dots. Excludes "expired" — that status only appears on archived
+# credentials, which render as plain rows without a dot, so it never shows up in the active list.
+STATUS_LEGEND = [
+    {"color": STATUS_COLOR["on-track"], "label": "On track — earning at a healthy pace this cycle"},
+    {"color": STATUS_COLOR["at-risk"], "label": "At risk — behind pace or a deadline is coming up"},
+    {"color": STATUS_COLOR["reminder"], "label": "Reminder only — no CE hours tracked for this one"},
+]
+
 
 def _category_view(row):
     ok = row["earned"] >= row["target"] if row["rule_type"] == "min" else row["earned"] <= row["target"]
