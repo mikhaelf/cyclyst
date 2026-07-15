@@ -154,6 +154,12 @@
           </label>
           {% if credential_form_errors.get('grace_period_days') %}<div class="form-error">{{ credential_form_errors['grace_period_days'] }}</div>{% endif %}
 
+          <label>Already confirmed on the issuer's platform, not logged here (optional)
+            <input type="text" name="manual_adjustment_hours" value="{{ credential_form_values.get('manual_adjustment_hours', '') }}" placeholder="e.g. 8.5 — hours the issuer's own portal already accepted">
+          </label>
+          {% if credential_form_errors.get('manual_adjustment_hours') %}<div class="form-error">{{ credential_form_errors['manual_adjustment_hours'] }}</div>{% endif %}
+          <div class="cf-hint">The issuer's portal is the real system of record — use this for hours it already confirms that you haven't itemized as activities here. It's added on top of the activity log below, no per-entry justification needed.</div>
+
           <div class="cf-categories">
             <div class="form-applies-label">Category rules (optional)</div>
             <div id="category-rows">
@@ -166,12 +172,13 @@
                 </select>
                 <input type="text" name="category_target" value="{{ cat.target }}" placeholder="hours">
                 <input type="text" class="category-parent-input" name="category_parent" value="{{ cat.parent_name or '' }}" placeholder="nested under (optional)">
+                <input type="text" class="category-adjustment-input" name="category_manual_adjustment" value="{{ cat.manual_adjustment or '' }}" placeholder="confirmed elsewhere">
                 <button type="button" class="category-remove-btn" onclick="this.closest('.category-rule-row').remove()">×</button>
               </div>
               {% endfor %}
             </div>
             {% if credential_form_errors.get('categories') %}<div class="form-error">{{ credential_form_errors['categories'] }}</div>{% endif %}
-            <div class="cf-hint">Optionally nest a rule under another by typing that rule's exact name in "nested under" — e.g. Ways of Working nested under Education — and its hours roll up into the parent's total too.</div>
+            <div class="cf-hint">Optionally nest a rule under another by typing that rule's exact name in "nested under" — e.g. Ways of Working nested under Education — and its hours roll up into the parent's total too. "Confirmed elsewhere" works the same way as above, scoped to just this one category.</div>
             <button type="button" class="btn-secondary small" onclick="cfAddCategoryRow()">+ Add category rule</button>
           </div>
         </div>
@@ -213,6 +220,7 @@
           </select>
           <input type="text" name="category_target" placeholder="hours">
           <input type="text" class="category-parent-input" name="category_parent" placeholder="nested under (optional)">
+          <input type="text" class="category-adjustment-input" name="category_manual_adjustment" placeholder="confirmed elsewhere">
           <button type="button" class="category-remove-btn" onclick="this.closest('.category-rule-row').remove()">×</button>
         </div>
       </template>

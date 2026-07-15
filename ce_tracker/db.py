@@ -19,6 +19,12 @@ CREDENTIAL_COLUMNS = [
     ("renews", "TEXT"),  # schema-only for now (design doc §9) — no computation branch reads this yet
 ]
 
+# The issuer's own portal is the real system of record for CPE/PDU totals — this tracker is a
+# secondary aggregator. `manual_adjustment_hours` (credentials) and `manual_adjustment`
+# (categories, added in the same migration) let a human enter "the portal already confirms N
+# more hours than I've logged here" without fabricating itemized activities to justify them.
+MANUAL_ADJUSTMENT_COLUMN = ("manual_adjustment_hours", "REAL")
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS credentials (
     id TEXT PRIMARY KEY,
@@ -47,7 +53,8 @@ CREATE TABLE IF NOT EXISTS categories (
     earned REAL NOT NULL,
     target REAL NOT NULL,
     rule_type TEXT NOT NULL, -- 'min' or 'max'
-    parent_id INTEGER REFERENCES categories(id) -- optional nesting, e.g. PMI's Talent Triangle legs inside "Education"
+    parent_id INTEGER REFERENCES categories(id), -- optional nesting, e.g. PMI's Talent Triangle legs inside "Education"
+    manual_adjustment REAL -- hours the issuer's portal already confirms, not backed by a local activity
 );
 
 CREATE TABLE IF NOT EXISTS activities (
@@ -218,6 +225,22 @@ def _migrate_grace_period_backfill(conn):
     )
 
 
+def _migrate_manual_adjustment_columns(conn):
+    """See MANUAL_ADJUSTMENT_COLUMN above — lets a human record hours the issuer's own portal
+    already confirms without backing them with a locally-itemized activity. No backfill here:
+    unlike grace_period_days (a stable issuer policy), these totals are personal and change
+    constantly as the user submits more to the issuer directly, so they're set once via the
+    Edit Credential form (or a one-off script), not baked into a migration that would go stale
+    immediately."""
+    cred_cols = {row["name"] for row in conn.execute("PRAGMA table_info(credentials)")}
+    if MANUAL_ADJUSTMENT_COLUMN[0] not in cred_cols:
+        conn.execute(f"ALTER TABLE credentials ADD COLUMN {MANUAL_ADJUSTMENT_COLUMN[0]} {MANUAL_ADJUSTMENT_COLUMN[1]}")
+
+    cat_cols = {row["name"] for row in conn.execute("PRAGMA table_info(categories)")}
+    if "manual_adjustment" not in cat_cols:
+        conn.execute("ALTER TABLE categories ADD COLUMN manual_adjustment REAL")
+
+
 def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = get_db()
@@ -227,6 +250,7 @@ def init_db():
     _migrate_dependency_any_of_column(conn)
     _migrate_category_parent_column(conn)
     _migrate_grace_period_backfill(conn)
+    _migrate_manual_adjustment_columns(conn)
     conn.commit()
     conn.close()
 

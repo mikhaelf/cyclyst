@@ -49,6 +49,11 @@ def _compute_category_results(activities, categories, cycle_start, cycle_end):
     level is most specific without double-entry. Flat (non-nested) categories — the common
     case — behave exactly as before: no parent, no children, earned = direct match only.
     This is entirely data-driven per credential; nothing here is specific to any one issuer.
+
+    A category's `manual_adjustment` folds in on top of its direct activity sum — the issuer's
+    own portal is the real system of record, and hours it already confirms don't need a
+    locally-itemized activity to back them (see credential-level manual_adjustment_hours below
+    for the same idea applied to the whole cycle total).
     """
     children_by_parent = {}
     for cat in categories:
@@ -57,7 +62,9 @@ def _compute_category_results(activities, categories, cycle_start, cycle_end):
             children_by_parent.setdefault(parent_id, []).append(cat)
 
     def direct_earned(cat):
-        return _sum_hours(activities, start=cycle_start, end=cycle_end, category=cat["name"])
+        logged = _sum_hours(activities, start=cycle_start, end=cycle_end, category=cat["name"])
+        adjustment = cat["manual_adjustment"] if "manual_adjustment" in cat.keys() else None
+        return logged + (adjustment or 0)
 
     def rollup_earned(cat):
         total = direct_earned(cat)
@@ -99,6 +106,7 @@ def compute_progress(credential_row, activities, categories, today=None):
         return {
             "status": status, "pct": None, "earned": None, "days_left": days_left,
             "on_track": None, "annual_earned": None, "category_results": [], "grace_days_left": None,
+            "earned_logged": None, "earned_adjustment": None,
         }
 
     if renewal_type != "cpe_hours":
@@ -106,13 +114,21 @@ def compute_progress(credential_row, activities, categories, today=None):
         return {
             "status": "reminder", "pct": None, "earned": None, "days_left": None,
             "on_track": None, "annual_earned": None, "category_results": [], "grace_days_left": None,
+            "earned_logged": None, "earned_adjustment": None,
         }
 
     cycle_start = credential_row["cycle_start_date"]
     cycle_end = credential_row["cycle_end_date"]
     total = credential_row["total"] or 0
 
-    earned = _sum_hours(activities, start=cycle_start, end=cycle_end)
+    # This tracker aggregates across issuers; it isn't itself the system of record — the
+    # issuer's own portal is. `manual_adjustment_hours` lets a human enter "the portal already
+    # confirms N more hours than I've logged here" without fabricating itemized activities to
+    # justify them (those hours were already accepted by the issuer directly).
+    earned_logged = _sum_hours(activities, start=cycle_start, end=cycle_end)
+    earned_adjustment = credential_row["manual_adjustment_hours"] if "manual_adjustment_hours" in credential_row.keys() else None
+    earned_adjustment = earned_adjustment or 0
+    earned = earned_logged + earned_adjustment
     pct = min(100, round(earned / total * 100)) if total else 0
 
     start_d = date.fromisoformat(cycle_start) if cycle_start else today
@@ -160,7 +176,7 @@ def compute_progress(credential_row, activities, categories, today=None):
     return {
         "status": status, "pct": pct, "earned": earned, "days_left": days_left,
         "on_track": on_track, "annual_earned": annual_earned, "category_results": category_results,
-        "grace_days_left": grace_days_left,
+        "grace_days_left": grace_days_left, "earned_logged": earned_logged, "earned_adjustment": earned_adjustment,
     }
 
 

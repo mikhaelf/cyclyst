@@ -364,6 +364,7 @@ html, body {
 .category-rule-row input[type="text"] { flex: 1; }
 .category-rule-row select { flex: none; width: 100px; }
 .category-rule-row .category-parent-input { flex: 0 0 150px; }
+.category-rule-row .category-adjustment-input { flex: 0 0 120px; }
 .cf-hint { font: 12px -apple-system, sans-serif; color: #98a2b3; }
 .category-remove-btn {
   flex: none; border: none; background: transparent; cursor: pointer;

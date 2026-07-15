@@ -120,8 +120,8 @@ def _insert_category_rows(conn, credential_id, category_rows):
     name_to_id = {}
     for cat in category_rows:
         cur = conn.execute(
-            "INSERT INTO categories (credential_id, name, earned, target, rule_type) VALUES (?,?,0,?,?)",
-            (credential_id, cat["name"], cat["target"], cat["rule_type"]),
+            "INSERT INTO categories (credential_id, name, earned, target, rule_type, manual_adjustment) VALUES (?,?,0,?,?,?)",
+            (credential_id, cat["name"], cat["target"], cat["rule_type"], cat.get("manual_adjustment")),
         )
         name_to_id[cat["name"]] = cur.lastrowid
     for cat in category_rows:
@@ -174,6 +174,7 @@ def _parse_credential_form(form):
         "annual_minimum": (form.get("annual_minimum") or "").strip(),
         "cycle_end_date": (form.get("cycle_end_date") or "").strip(),
         "grace_period_days": (form.get("grace_period_days") or "").strip(),
+        "manual_adjustment_hours": (form.get("manual_adjustment_hours") or "").strip(),
         "note": (form.get("note") or "").strip(),
         "badge_platform": (form.get("badge_platform") or "").strip(),
         "badge_url": (form.get("badge_url") or "").strip(),
@@ -184,6 +185,7 @@ def _parse_credential_form(form):
     total = None
     annual_minimum = None
     grace_period_days = None
+    manual_adjustment_hours = None
     annual_minimum_type = values["annual_minimum_type"] if values["annual_minimum_type"] in ("suggested", "mandatory") else None
 
     if renewal_type == "cpe_hours":
@@ -232,6 +234,14 @@ def _parse_credential_form(form):
             except ValueError:
                 errors["grace_period_days"] = "Enter a whole number of days, or leave blank for no grace period."
 
+        if values["manual_adjustment_hours"]:
+            try:
+                manual_adjustment_hours = float(values["manual_adjustment_hours"])
+                if manual_adjustment_hours < 0:
+                    errors["manual_adjustment_hours"] = "Enter a positive number, or leave blank."
+            except ValueError:
+                errors["manual_adjustment_hours"] = "Enter a number, or leave blank."
+
     else:  # exam
         if not values["cycle_end_date"]:
             errors["cycle_end_date"] = "Expiration date is required."
@@ -246,6 +256,7 @@ def _parse_credential_form(form):
     rules = form.getlist("category_rule")
     targets = form.getlist("category_target")
     parents = form.getlist("category_parent")
+    adjustments = form.getlist("category_manual_adjustment")
     submitted_names = {(n or "").strip() for n in names if (n or "").strip()}
     for i, cat_name in enumerate(names):
         cat_name = (cat_name or "").strip()
@@ -265,9 +276,17 @@ def _parse_credential_form(form):
         parent_name = (parents[i] if i < len(parents) else "").strip()
         if parent_name not in submitted_names or parent_name == cat_name:
             parent_name = None
+        adjustment_raw = (adjustments[i] if i < len(adjustments) else "").strip()
+        manual_adjustment = None
+        if adjustment_raw:
+            try:
+                manual_adjustment = float(adjustment_raw)
+            except ValueError:
+                errors["categories"] = f'Enter a number for the confirmed-elsewhere hours on "{cat_name}", or leave it blank.'
+                continue
         category_rows.append({
             "name": cat_name, "rule_type": rule if rule in ("min", "max") else "min",
-            "target": target, "parent_name": parent_name,
+            "target": target, "parent_name": parent_name, "manual_adjustment": manual_adjustment,
         })
 
     parsed = {
@@ -280,6 +299,7 @@ def _parse_credential_form(form):
         "annual_minimum": annual_minimum,
         "annual_minimum_type": annual_minimum_type if renewal_type == "cpe_hours" else None,
         "grace_period_days": grace_period_days if renewal_type == "cpe_hours" else None,
+        "manual_adjustment_hours": manual_adjustment_hours if renewal_type == "cpe_hours" else None,
         "category_rows": category_rows if renewal_type == "cpe_hours" else [],
     }
     return values, parsed, errors
@@ -407,15 +427,15 @@ def create_credential():
 
     conn.execute(
         "INSERT INTO credentials (id, name, issuer, member_id, status, renewal_type, cycle_start_date, cycle_end_date, "
-        "reporting_calendar, unit, total, annual_minimum, annual_minimum_type, grace_period_days, note, "
-        "badge_platform, badge_url, badge_visibility) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "reporting_calendar, unit, total, annual_minimum, annual_minimum_type, grace_period_days, "
+        "manual_adjustment_hours, note, badge_platform, badge_url, badge_visibility) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
             new_id, values["name"], values["issuer"], values["member_id"] or None, "on-track", parsed["renewal_type"],
             parsed["cycle_start_date"], parsed["cycle_end_date"], parsed["reporting_calendar"],
             parsed["unit"], parsed["total"], parsed["annual_minimum"], parsed["annual_minimum_type"],
-            parsed["grace_period_days"], values["note"] or None, badge_platform, badge_url,
-            _derive_badge_visibility(badge_platform, badge_url),
+            parsed["grace_period_days"], parsed["manual_adjustment_hours"], values["note"] or None,
+            badge_platform, badge_url, _derive_badge_visibility(badge_platform, badge_url),
         ),
     )
     _insert_category_rows(conn, new_id, parsed["category_rows"])
@@ -434,7 +454,8 @@ def edit_credential_form(credential_id):
         return render_template("partials/body.html", **_body_context(None, "overview"))
 
     categories = conn.execute(
-        "SELECT id, name, target, rule_type, parent_id FROM categories WHERE credential_id = ?", (credential_id,)
+        "SELECT id, name, target, rule_type, parent_id, manual_adjustment FROM categories WHERE credential_id = ?",
+        (credential_id,),
     ).fetchall()
     conn.close()
 
@@ -443,6 +464,7 @@ def edit_credential_form(credential_id):
         {
             "name": c["name"], "target": c["target"], "rule_type": c["rule_type"],
             "parent_name": id_to_name.get(c["parent_id"]),
+            "manual_adjustment": "" if c["manual_adjustment"] is None else f"{c['manual_adjustment']:g}",
         }
         for c in categories
     ]
@@ -471,6 +493,7 @@ def edit_credential_form(credential_id):
         "annual_minimum": "" if row["annual_minimum"] is None else f"{row['annual_minimum']:g}",
         "cycle_end_date": row["cycle_end_date"] or "",
         "grace_period_days": "" if row["grace_period_days"] is None else str(row["grace_period_days"]),
+        "manual_adjustment_hours": "" if row["manual_adjustment_hours"] is None else f"{row['manual_adjustment_hours']:g}",
         "note": row["note"] or "",
         "badge_platform": row["badge_platform"] or "",
         "badge_url": row["badge_url"] or "",
@@ -500,12 +523,13 @@ def update_credential(credential_id):
     conn = get_db()
     conn.execute(
         "UPDATE credentials SET name=?, issuer=?, member_id=?, renewal_type=?, cycle_start_date=?, cycle_end_date=?, "
-        "reporting_calendar=?, unit=?, total=?, annual_minimum=?, annual_minimum_type=?, grace_period_days=?, note=?, "
-        "badge_platform=?, badge_url=?, badge_visibility=? WHERE id=?",
+        "reporting_calendar=?, unit=?, total=?, annual_minimum=?, annual_minimum_type=?, grace_period_days=?, "
+        "manual_adjustment_hours=?, note=?, badge_platform=?, badge_url=?, badge_visibility=? WHERE id=?",
         (
             values["name"], values["issuer"], values["member_id"] or None, parsed["renewal_type"], parsed["cycle_start_date"],
             parsed["cycle_end_date"], parsed["reporting_calendar"], parsed["unit"], parsed["total"],
-            parsed["annual_minimum"], parsed["annual_minimum_type"], parsed["grace_period_days"], values["note"] or None,
+            parsed["annual_minimum"], parsed["annual_minimum_type"], parsed["grace_period_days"],
+            parsed["manual_adjustment_hours"], values["note"] or None,
             badge_platform, badge_url, _derive_badge_visibility(badge_platform, badge_url),
             credential_id,
         ),
@@ -610,7 +634,8 @@ def _credential_and_in_cycle_activities(conn, credential_id):
         return None, None, None, None
 
     categories = conn.execute(
-        "SELECT id, name, target, rule_type, parent_id FROM categories WHERE credential_id = ?", (credential_id,)
+        "SELECT id, name, target, rule_type, parent_id, manual_adjustment FROM categories WHERE credential_id = ?",
+        (credential_id,),
     ).fetchall()
     activities = conn.execute(
         "SELECT * FROM activities WHERE ',' || applies || ',' LIKE '%,' || ? || ',%' ORDER BY date", (credential_id,)

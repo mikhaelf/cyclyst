@@ -1,5 +1,7 @@
 """Builds view-model dicts for templates, mirroring the mockup's buildCredentialsView/buildCategoriesView logic."""
 
+from datetime import date
+
 from . import progress
 from .db import get_db
 
@@ -57,7 +59,8 @@ def _activity_view(row):
 
 def _fetch_categories(conn, credential_id):
     return conn.execute(
-        "SELECT id, name, target, rule_type, parent_id FROM categories WHERE credential_id = ?", (credential_id,)
+        "SELECT id, name, target, rule_type, parent_id, manual_adjustment FROM categories WHERE credential_id = ?",
+        (credential_id,),
     ).fetchall()
 
 
@@ -76,6 +79,35 @@ def _annual_label(row, annual_earned):
     if minimum_type == "suggested":
         return f"No mandatory floor — suggested pace {minimum:g}/yr — {annual_earned:g} earned this window."
     return None
+
+
+def _cycle_label(row):
+    """cycle_label was a hand-typed display column from the original static seed data — once a
+    credential's real cycle_start_date/cycle_end_date are known (cpe_hours type), derive the
+    label from them so editing the dates through the Add/Edit Credential form can't leave a
+    stale label behind. Exam-type credentials keep their curated stored label (e.g. "Re-exam
+    required") since there's no natural start/end pair to derive from."""
+    if row["renewal_type"] == "cpe_hours" and row["cycle_start_date"] and row["cycle_end_date"]:
+        start = date.fromisoformat(row["cycle_start_date"])
+        end = date.fromisoformat(row["cycle_end_date"])
+        return f"{start:%b %Y} – {end:%b %Y}"
+    return row["cycle_label"]
+
+
+def _earned_label(row, prog):
+    if row["total"] is None:
+        return "No CE hours tracked for this credential."
+    earned, total, unit = prog["earned"], row["total"], row["unit"]
+    adjustment = prog.get("earned_adjustment") or 0
+    if adjustment:
+        # Transparency: distinguish hours backed by a local activity from hours the issuer's
+        # portal already confirms but this tracker never itemized (see manual_adjustment_hours).
+        logged = prog["earned_logged"]
+        return (
+            f"{earned:g} of {total:g} {unit} earned this cycle "
+            f"({logged:g} logged here + {adjustment:g} confirmed on {row['issuer']}'s platform)"
+        )
+    return f"{earned:g} of {total:g} {unit} earned this cycle"
 
 
 def _days_label(status, days_left, grace_days_left=None):
@@ -112,11 +144,7 @@ def credential_view(row, conn):
     status_color = STATUS_COLOR[status]
     pct = prog["pct"]
     pct_label = "—" if pct is None else f"{pct}%"
-    earned_label = (
-        "No CE hours tracked for this credential."
-        if row["total"] is None
-        else f"{prog['earned']:g} of {row['total']:g} {row['unit']} earned this cycle"
-    )
+    earned_label = _earned_label(row, prog)
     annual_label = _annual_label(row, prog["annual_earned"]) if prog["annual_earned"] is not None else None
 
     return {
@@ -124,7 +152,7 @@ def credential_view(row, conn):
         "name": row["name"],
         "issuer": row["issuer"],
         "member_id": row["member_id"],
-        "cycle_label": row["cycle_label"],
+        "cycle_label": _cycle_label(row),
         "days_left": prog["days_left"],
         "days_label": _days_label(status, prog["days_left"], prog["grace_days_left"]),
         "pct": pct,
