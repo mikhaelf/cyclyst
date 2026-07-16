@@ -24,8 +24,11 @@ def _body_context(selected_id, tab):
         "pending": views.pending_view(conn),
         "tab": tab,
         "all_credentials": [
+            # Only cpe_hours credentials accumulate CE from logged activities — exam and
+            # mandatory_module renewals have fixed expirations / vendor pass-fail modules, so
+            # they're never a valid "applies to" target for an activity log entry.
             dict(r) for r in conn.execute(
-                "SELECT id, name FROM credentials WHERE archived = 0 ORDER BY rowid"
+                "SELECT id, name FROM credentials WHERE archived = 0 AND renewal_type = 'cpe_hours' ORDER BY rowid"
             ).fetchall()
         ],
         "category_options": [
