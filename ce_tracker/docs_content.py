@@ -49,7 +49,8 @@ DOCS_SECTIONS = [
         "title": "Generate a report",
         "body": """
             <p class="docs-copy">The <strong>Reports</strong> tab builds an itemized record of your
-            activity for a credential's current cycle. Export options are coming soon.</p>
+            activity for a credential's current cycle, ready to download as CSV or as an
+            audit-ready PDF.</p>
         """,
     },
     {
