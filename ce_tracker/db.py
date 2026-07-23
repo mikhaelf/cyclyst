@@ -1,9 +1,12 @@
+import os
 import re
 import sqlite3
 from datetime import date, timedelta
 from pathlib import Path
 
-DB_PATH = Path(__file__).resolve().parent.parent / "data" / "tracker.db"
+# Overridable so tests and non-default setups can point at their own database file.
+# The default lives in the gitignored data/ directory — see README "Where your data lives".
+DB_PATH = Path(os.environ.get("CE_TRACKER_DB") or Path(__file__).resolve().parent.parent / "data" / "tracker.db")
 
 # New columns added to `credentials` for computed (not stored) progress tracking.
 # See ce-cpe-tracker-design.md §3/§9 for the source schema this maps to.

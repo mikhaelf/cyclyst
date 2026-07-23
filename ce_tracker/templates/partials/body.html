@@ -96,7 +96,7 @@
         {% if credential_form_errors.get('issuer') %}<div class="form-error">{{ credential_form_errors['issuer'] }}</div>{% endif %}
 
         <label>Member / cert ID (optional)
-          <input type="text" name="member_id" value="{{ credential_form_values.get('member_id', '') }}" placeholder="e.g. REDACTED_MEMBER_ID">
+          <input type="text" name="member_id" value="{{ credential_form_values.get('member_id', '') }}" placeholder="e.g. 123456">
         </label>
 
         <label>Renewal type*
