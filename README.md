@@ -56,6 +56,10 @@ per-credential progress, pace status, and audit-ready reports.
   groups).
 - **One activity, many credentials:** each logged activity applies to any set of
   hour-based credentials; category rollups update everywhere at once.
+- **Certificate upload auto-fill:** attach a certificate of completion (PDF) on the Add
+  Training form and it pre-fills date, hours, provider, and title where confidently found —
+  local-only, no network call, no file ever saved to disk. You still review and save the
+  form yourself.
 - **Pending-review queue** for ingested candidates, with duplicate detection against your
   existing log and sticky dismissals (a dismissed event never resurfaces).
 - **Reports:** itemized CSV and audit-ready PDF exports scoped to a credential's current
@@ -111,7 +115,9 @@ Backups are just a copy of that one file.
    "confirmed elsewhere" adjustment hours.
 2. **Log activities** as you complete them — date, provider, title, hours, category, and
    *every* credential they apply to. Only hour-based (`cpe_hours`) credentials are offered
-   as targets; exam-only credentials never accumulate hours.
+   as targets; exam-only credentials never accumulate hours. Optionally attach a certificate
+   of completion (PDF) first and click **Extract Details** to pre-fill what it can find —
+   review the fields before saving either way.
 3. **Review pending items** (if you use ingestion): approve to commit an item to your log —
    you supply the category and applies-to yourself, the machine never guesses them — or
    dismiss it permanently.
@@ -161,6 +167,7 @@ Single-language Python stack, chosen for hackability over ceremony:
 | Interactivity | HTMX + a little vanilla JS — no SPA, no Node toolchain |
 | Storage | SQLite via the stdlib `sqlite3` module |
 | PDF export | ReportLab |
+| Certificate parsing | pypdf (local text extraction, no network) |
 
 ```
 ce_tracker/
@@ -170,6 +177,7 @@ ce_tracker/
   routes.py           Flask routes (dashboard, CRUD, review, exports)
   reports.py          CSV/PDF generation
   calendar_ingest.py  event scoring + staging CLI (pure stdlib)
+  certificate_parse.py  local PDF text extraction + field heuristics for upload auto-fill
   docs_content.py     in-app docs text
   templates/ static/  UI
 run.py                dev entry point
@@ -202,6 +210,10 @@ file.**
 - `cpe_hours` and `exam` renewal types are fully computed. `mandatory_module`
   (vendor-scheduled pass/fail refreshers) has schema columns reserved but no computation
   yet — it'll be added when a tracked credential actually needs it.
+- Certificate upload auto-fill only reads text-layer PDFs — scanned/photographed
+  certificates (image-only PDFs) aren't handled yet, and fields it isn't confident about are
+  left blank rather than guessed. See `ce-cpe-tracker-design.md` §11 for the heuristic and a
+  possible future LLM-based fallback (opt-in, not built).
 - Single-user by design. No auth, no multi-tenancy — run it on your own machine.
 - The Flask dev server is fine for localhost use; put a real WSGI server (e.g. gunicorn)
   in front of it if you expose it beyond loopback.
@@ -212,6 +224,10 @@ file.**
 - Route-level test coverage (business logic is covered; HTTP layer isn't yet)
 - Gmail ingestion into the same pending-review queue (local-only, same
   explicit-signal-first philosophy)
+- OCR fast-follow for scanned/image certificate uploads (`pytesseract`, adds a system
+  dependency — deferred until local PDF-text parsing proves useful enough to justify it)
+- Opt-in LLM-based fallback for certificate parsing when local heuristics miss — would be
+  the project's first outbound network call, so off by default and disclosed clearly
 - Browser-assisted submission helper — pre-filling issuer portal forms with a required
   human "go" per record, never batch auto-submit
 

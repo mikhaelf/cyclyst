@@ -256,6 +256,18 @@ html, body {
 .form-error { font: 11.5px -apple-system, sans-serif; color: #d64545; }
 .form-actions { display: flex; gap: 10px; margin-top: 4px; }
 
+.certificate-upload-form {
+  display: flex; align-items: flex-end; gap: 12px; margin-bottom: 10px;
+}
+.certificate-upload-form label {
+  display: flex; flex-direction: column; gap: 4px; flex: 1;
+  font: 600 12px -apple-system, sans-serif; color: #344054;
+}
+.certificate-upload-form input[type="file"] {
+  font: 12.5px -apple-system, sans-serif; color: #161a23;
+}
+.form-note { font: 11.5px -apple-system, sans-serif; color: #667085; margin-bottom: 10px; }
+
 /* Activity tab */
 .activity-row {
   display: flex; justify-content: space-between; align-items: flex-start;

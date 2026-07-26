@@ -5,7 +5,7 @@ from datetime import date
 
 from flask import Blueprint, Response, render_template, request
 
-from . import progress, reports, views
+from . import certificate_parse, progress, reports, views
 from .db import get_db
 from .docs_content import DOCS_SECTIONS
 
@@ -42,6 +42,7 @@ def _body_context(selected_id, tab):
         "review_pending_id": None,
         "form_values": {},
         "form_errors": {},
+        "certificate_parse_note": None,
         "docs_view": False,
         "docs_sections": [],
         "show_badge_form": False,
@@ -349,6 +350,56 @@ def new_activity_form():
         "applies": [context["credential"]["id"]] if context["credential"] else [],
         "status": "logged",
     }
+    return render_template("partials/body.html", **context)
+
+
+@bp.route("/activities/parse-certificate", methods=["POST"])
+def parse_certificate():
+    """Local-only best-effort extraction from an uploaded certificate (design doc §11).
+    Re-renders the add-activity form with whatever fields were found pre-filled; never
+    saves anything — the user still reviews and submits the form themselves."""
+    selected_id = request.args.get("selected")
+    context = _body_context(selected_id, "activity")
+    context["show_add_form"] = True
+    base_values = {
+        "date": date.today().isoformat(),
+        "applies": [context["credential"]["id"]] if context["credential"] else [],
+        "status": "logged",
+    }
+
+    file_storage = request.files.get("certificate")
+    if file_storage is None or not file_storage.filename:
+        context["form_values"] = base_values
+        context["certificate_parse_note"] = "Choose a file before extracting."
+        return render_template("partials/body.html", **context)
+
+    try:
+        parsed = certificate_parse.parse(file_storage)
+    except certificate_parse.UnsupportedFileType as exc:
+        context["form_values"] = base_values
+        context["certificate_parse_note"] = str(exc)
+        return render_template("partials/body.html", **context)
+    except Exception:
+        # Uploaded files are a user-input boundary — a corrupt/malformed PDF shouldn't 500
+        # the app, it should just fall back to manual entry.
+        context["form_values"] = base_values
+        context["certificate_parse_note"] = "Couldn't read that file — fill in the details manually."
+        return render_template("partials/body.html", **context)
+
+    found = [field for field in ("date", "hours", "provider", "title") if parsed.get(field)]
+    context["form_values"] = {
+        "date": parsed["date"] or base_values["date"],
+        "provider": parsed["provider"],
+        "title": parsed["title"],
+        "hours": parsed["hours"],
+        "applies": base_values["applies"],
+        "status": base_values["status"],
+    }
+    context["certificate_parse_note"] = (
+        f"Filled in from the certificate: {', '.join(found)}. Review before saving."
+        if found
+        else "Couldn't confidently read any fields from that file — fill them in manually."
+    )
     return render_template("partials/body.html", **context)
 
 

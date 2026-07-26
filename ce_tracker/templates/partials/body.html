@@ -363,6 +363,17 @@
         </div>
 
         {% if show_add_form %}
+        {% if not edit_activity_id and not review_pending_id %}
+        <form class="certificate-upload-form"
+              hx-post="{{ url_for('main.parse_certificate', selected=credential.id) }}"
+              hx-target="#app-body" hx-swap="innerHTML" hx-encoding="multipart/form-data">
+          <label>Upload a certificate of completion (PDF) to auto-fill the fields below
+            <input type="file" name="certificate" accept="application/pdf">
+          </label>
+          <button type="submit" class="btn-secondary">Extract Details</button>
+        </form>
+        {% if certificate_parse_note %}<div class="form-note">{{ certificate_parse_note }}</div>{% endif %}
+        {% endif %}
         <form class="add-activity-form"
               hx-post="{{ url_for('main.approve_pending_reviewed', pending_id=review_pending_id, selected=credential.id) if review_pending_id else (url_for('main.update_activity', activity_id=edit_activity_id, selected=credential.id) if edit_activity_id else url_for('main.create_activity', selected=credential.id)) }}"
               hx-target="#app-body" hx-swap="innerHTML">
