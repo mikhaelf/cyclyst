@@ -33,5 +33,7 @@ Web-driven, not CLI-first (decided 2026-07-14, superseding design doc §8). Sing
 
 - Flask + server-rendered Jinja2 templates + HTMX/vanilla JS — no SPA, no build step.
 - SQLite via stdlib `sqlite3` (file at `data/tracker.db`, gitignored); ReportLab for PDF export.
+- `pypdf` for local-only certificate-upload text extraction (see `ce_tracker/certificate_parse.py`
+  and `ce-cpe-tracker-design.md` §11) — no network call, text-layer PDFs only for now.
 - No Docker yet — planned alongside the open-source release (see `PUBLISHING-CHECKLIST.md`), not before.
 - **Google API access is deliberately absent.** Calendar ingestion (`ce_tracker/calendar_ingest.py`) is pure stdlib: a live session with calendar access (e.g. Claude with the Google Calendar connector) exports events to JSON and hands them to the module's CLI, which scores and stages candidates into pending review. Gmail ingestion is unbuilt; a fully automated API-client pipeline only matters for the SaaS path.

@@ -23,6 +23,10 @@ DOCS_SECTIONS = [
             <ol class="docs-steps">
                 <li>Open a credential, then click the <strong>Activity Log</strong> tab.</li>
                 <li>Click <strong>+ Add Activity</strong>.</li>
+                <li>Optional: attach a certificate of completion (PDF) and click
+                <strong>Extract Details</strong> to pre-fill what it can find — this runs
+                locally, nothing is uploaded anywhere. Always double-check the fields it
+                fills in before saving.</li>
                 <li>Fill in the date, hours, title, and which credential(s) it applies to —
                 one activity can count toward more than one credential.</li>
                 <li>Click <strong>Save Activity</strong>. It's added to your log right away.</li>
