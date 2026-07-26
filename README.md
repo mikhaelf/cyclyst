@@ -72,13 +72,17 @@ per-credential progress, pace status, and audit-ready reports.
 Requires Python 3.10+ (3.11+ recommended). No Node.js, no build step, no Docker required.
 
 ```bash
-git clone <this-repo>
-cd <this-repo>
+git clone https://github.com/mikhaelf/agentic-ce-sync.git
+cd agentic-ce-sync
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python run.py
 ```
+
+> **Private repo:** if you clone over HTTPS, authenticate with `gh auth login` or a
+> personal access token with `repo` scope. Collaborators must be added on GitHub before
+> they can clone.
 
 Open http://127.0.0.1:5000. A fresh install starts **empty** — click **+ Add Credential**
 and enter your first credential's rules (cycle dates, renewal type, hour total, category
@@ -103,8 +107,108 @@ throwaway file keeps it out of your real data.
 ### Where your data lives
 
 Everything is stored in `data/tracker.db` (SQLite), which is gitignored — it never enters
-version control. Set the `CE_TRACKER_DB` environment variable to keep it somewhere else.
-Backups are just a copy of that one file.
+version control. Backups are just a copy of that one file.
+
+| Environment variable | Default | Purpose |
+|---|---|---|
+| `CE_TRACKER_DB` | `data/tracker.db` (under the repo root) | Path to the SQLite file. Use this to keep test and production data separate, or to store the DB outside the repo directory. |
+| `CE_TRACKER_DEMO` | unset | Set to `1` to load fictional sample credentials on startup — **only if the database is empty**. |
+
+Example — isolated test database with demo data:
+
+```bash
+CE_TRACKER_DEMO=1 CE_TRACKER_DB="$HOME/ce-tracker-test/tracker.db" python run.py
+```
+
+### What is in git vs. what you rebuild locally
+
+| Piece | In git? | On a fresh machine / user account |
+|---|---|---|
+| Application code | Yes | `git clone` (then `git pull` for updates) |
+| Python venv (`.venv/`) | No | Create with `python3 -m venv .venv` and `pip install -r requirements.txt` |
+| Your tracker data (`data/tracker.db`) | No | Starts empty, or copy a `.db` file manually (see below) |
+| `CLAUDE.local.md`, `.claude/` | No | Optional local notes / AI-tool config — copy only if you want them |
+| Issuer handbook PDFs (`Credential Providers/`) | No | Local reference material only |
+
+**Code sync:** push from one environment, `git pull` in another.
+
+**Data sync:** never through git. Copy `tracker.db` explicitly, or use separate
+`CE_TRACKER_DB` paths so environments do not accidentally share production data.
+
+### Setup on another macOS user account (testing)
+
+Each macOS user has their own home directory, so the usual pattern is: **same repo from
+GitHub, separate database per account.** Do not copy `.venv/` across accounts — paths and
+permissions differ; rebuild the venv instead.
+
+#### Recommended: sandbox with demo data
+
+Safest for UI or feature testing — no real cert numbers or activity history.
+
+```bash
+gh auth login   # or use HTTPS + a personal access token
+git clone https://github.com/mikhaelf/agentic-ce-sync.git
+cd agentic-ce-sync
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+CE_TRACKER_DEMO=1 CE_TRACKER_DB="$HOME/ce-tracker-test/tracker.db" python run.py
+```
+
+Open http://127.0.0.1:5000. Demo seeding runs only when the target database has no
+credentials yet.
+
+#### Optional: copy an existing database for realistic testing
+
+Use this only when you intentionally want the same layout and records on the test account
+(e.g. to reproduce a bug against real data). Stop the app on both accounts before copying.
+
+On the **source** account:
+
+```bash
+cp /path/to/agentic-ce-sync/data/tracker.db /Users/Shared/ce-tracker-test.db
+chmod 644 /Users/Shared/ce-tracker-test.db
+```
+
+On the **test** account:
+
+```bash
+git clone https://github.com/mikhaelf/agentic-ce-sync.git
+cd agentic-ce-sync
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+mkdir -p data
+cp /Users/Shared/ce-tracker-test.db data/tracker.db
+python run.py
+```
+
+Remove the file from `/Users/Shared/` when finished if it contains sensitive cert data.
+
+#### Optional shell aliases
+
+Add to `~/.zshrc` or `~/.bashrc` on any account:
+
+```bash
+alias ce-tracker='cd ~/agentic-ce-sync && source .venv/bin/activate && python run.py'
+alias ce-tracker-demo='cd ~/agentic-ce-sync && source .venv/bin/activate && CE_TRACKER_DEMO=1 CE_TRACKER_DB="$HOME/ce-tracker-test/tracker.db" python run.py'
+```
+
+Adjust the `cd` path if the repo lives somewhere other than `~/agentic-ce-sync`.
+
+#### GitHub push note (email privacy)
+
+If `git push` is rejected with an email-privacy error (GitHub error GH007), either allow
+command-line pushes in [GitHub email settings](https://github.com/settings/emails) or set
+your git author email to your GitHub noreply address:
+
+```bash
+git config --global user.email "YOUR_GITHUB_USERNAME@users.noreply.github.com"
+```
+
+New commits will use that address. Existing commits already in history keep their original
+author email until you rewrite history (usually unnecessary once the first push succeeds).
 
 ## Using the tracker
 
