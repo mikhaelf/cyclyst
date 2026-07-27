@@ -124,25 +124,41 @@ def _score_duplicate(candidate, row):
     if cand_provider and row_provider:
         if cand_provider.lower() in row_provider.lower() or row_provider.lower() in cand_provider.lower():
             score = min(1.0, score + 0.1)
+
+    # Hours is a secondary signal, not a gate: candidates that never carry an hours guess
+    # (most calendar events) skip this untouched, same score as before. When both sides do
+    # have one, an exact match nudges score up; a large mismatch (>50% apart) pulls it back
+    # down even if the title matched well, so a same-day near-duplicate with wildly different
+    # hours doesn't get silently treated as the same activity on title alone.
+    cand_hours = candidate.get("hours_guess")
+    row_hours = row["hours_guess"] if "hours_guess" in row.keys() else None
+    if cand_hours is not None and row_hours is not None:
+        if cand_hours == row_hours:
+            score = min(1.0, score + 0.1)
+        elif row_hours and abs(cand_hours - row_hours) / row_hours > 0.5:
+            score = max(0.0, score - 0.15)
+
     return score
 
 
 def _find_duplicate(conn, candidate):
     """Same-date is a required gate (checked via the WHERE clause); title similarity is the
-    primary signal, with a small bonus if provider also matches. Checked against both real
-    activities and other already-staged pending rows, since a calendar event might duplicate
-    something logged manually from a certificate, not just another calendar scan."""
+    primary signal, with a small bonus if provider also matches and if hours also line up.
+    Checked against both real activities and other already-staged pending rows, since a
+    calendar event might duplicate something logged manually from a certificate, not just
+    another calendar scan. `activities.hours` is aliased to `hours_guess` so both queries
+    hand `_score_duplicate` the same field name regardless of which table a row came from."""
     best = None
 
     for row in conn.execute(
-        "SELECT id, title, provider FROM activities WHERE date = ?", (candidate["date"],)
+        "SELECT id, title, provider, hours AS hours_guess FROM activities WHERE date = ?", (candidate["date"],)
     ):
         score = _score_duplicate(candidate, row)
         if score >= DUPLICATE_TITLE_THRESHOLD and (best is None or score > best[1]):
             best = (f"activity:{row['id']}", score)
 
     for row in conn.execute(
-        "SELECT id, title, provider FROM pending_activities WHERE date = ? AND id != ?",
+        "SELECT id, title, provider, hours_guess FROM pending_activities WHERE date = ? AND id != ?",
         (candidate["date"], candidate["id"]),
     ):
         score = _score_duplicate(candidate, row)

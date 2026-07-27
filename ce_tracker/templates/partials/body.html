@@ -154,11 +154,11 @@
           </label>
           {% if credential_form_errors.get('grace_period_days') %}<div class="form-error">{{ credential_form_errors['grace_period_days'] }}</div>{% endif %}
 
-          <label>Already confirmed on the issuer's platform, not logged here (optional)
-            <input type="text" name="manual_adjustment_hours" value="{{ credential_form_values.get('manual_adjustment_hours', '') }}" placeholder="e.g. 8.5 — hours the issuer's own portal already accepted">
+          <label>Issuer portal's confirmed total for this cycle (optional)
+            <input type="text" name="manual_adjustment_hours" value="{{ credential_form_values.get('manual_adjustment_hours', '') }}" placeholder="e.g. 36 — the total the issuer's own portal currently shows">
           </label>
           {% if credential_form_errors.get('manual_adjustment_hours') %}<div class="form-error">{{ credential_form_errors['manual_adjustment_hours'] }}</div>{% endif %}
-          <div class="cf-hint">The issuer's portal is the real system of record — use this for hours it already confirms that you haven't itemized as activities here. It's added on top of the activity log below, no per-entry justification needed.</div>
+          <div class="cf-hint">The issuer's portal is the real system of record — enter its current total here, refreshed whenever you check it. Any gap versus what's itemized in the activity log below fills in automatically, and shrinks as you log more, so the same hours are never double-counted.</div>
 
           <div class="cf-categories">
             <div class="form-applies-label">Category rules (optional)</div>
@@ -456,6 +456,16 @@
         {% endif %}
 
       {% elif tab == 'pending' %}
+        <form class="certificate-upload-form"
+              hx-post="{{ url_for('main.import_transcripts', selected=credential.id) }}"
+              hx-target="#app-body" hx-swap="innerHTML" hx-encoding="multipart/form-data">
+          <label>Import CE transcript PDF(s) from an issuer (e.g. ISC2's "Official CPE Transcript" export) — every record found is staged below for review, duplicates are flagged or skipped automatically
+            <input type="file" name="transcripts" accept="application/pdf" multiple>
+          </label>
+          <button type="submit" class="btn-secondary">Import Transcripts</button>
+        </form>
+        {% if transcript_import_note %}<div class="form-note">{{ transcript_import_note }}</div>{% endif %}
+
         {% if pending %}
           {% for p in pending %}
           <div class="pending-card">

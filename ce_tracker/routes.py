@@ -5,7 +5,7 @@ from datetime import date
 
 from flask import Blueprint, Response, render_template, request
 
-from . import certificate_parse, progress, reports, views
+from . import certificate_parse, progress, reports, transcript_parse, views
 from .db import get_db
 from .docs_content import DOCS_SECTIONS
 
@@ -43,6 +43,7 @@ def _body_context(selected_id, tab):
         "form_values": {},
         "form_errors": {},
         "certificate_parse_note": None,
+        "transcript_import_note": None,
         "docs_view": False,
         "docs_sections": [],
         "show_badge_form": False,
@@ -400,6 +401,51 @@ def parse_certificate():
         if found
         else "Couldn't confidently read any fields from that file — fill them in manually."
     )
+    return render_template("partials/body.html", **context)
+
+
+@bp.route("/activities/import-transcripts", methods=["POST"])
+def import_transcripts():
+    """Bulk multi-record PDF transcript upload (design doc §11a): parses every uploaded file
+    and stages surviving candidates into pending_activities via transcript_parse.stage_batch —
+    never a direct write to activities, same as every other candidate source. Re-renders the
+    Pending Review tab with a summary of what happened."""
+    selected_id = request.args.get("selected")
+    files = request.files.getlist("transcripts")
+
+    if not files or not any(f.filename for f in files):
+        context = _body_context(selected_id, "pending")
+        context["transcript_import_note"] = "Choose one or more PDF transcripts before importing."
+        return render_template("partials/body.html", **context)
+
+    conn = get_db()
+    summary = transcript_parse.stage_batch(conn, files)
+    conn.close()
+
+    # Rebuild context after staging, not before — it re-reads pending_activities so the
+    # newly staged (or duplicate-flagged) rows actually show up in the list rendered below.
+    context = _body_context(selected_id, "pending")
+
+    parts = []
+    if summary["staged"]:
+        parts.append(f"{len(summary['staged'])} new item(s) staged for review")
+    if summary["flagged_possible_duplicates"]:
+        parts.append(f"{len(summary['flagged_possible_duplicates'])} flagged as possible duplicates")
+    if summary["skipped_exact_duplicates"]:
+        parts.append(
+            f"{len(summary['skipped_exact_duplicates'])} skipped as near-certain duplicates "
+            "of something already logged or already awaiting review"
+        )
+    if summary["rollover_rows"]:
+        rollover_total = sum(r["hours"] for r in summary["rollover_rows"])
+        parts.append(
+            f"{rollover_total:g} rollover credit(s) found but not staged as activities — "
+            "consider a manual adjustment on the relevant credential instead"
+        )
+    if summary["file_errors"]:
+        parts.append(f"couldn't read: {', '.join(summary['file_errors'])}")
+
+    context["transcript_import_note"] = "; ".join(parts) if parts else "No CE records found in the uploaded file(s)."
     return render_template("partials/body.html", **context)
 
 

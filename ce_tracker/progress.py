@@ -122,12 +122,15 @@ def compute_progress(credential_row, activities, categories, today=None):
     total = credential_row["total"] or 0
 
     # This tracker aggregates across issuers; it isn't itself the system of record — the
-    # issuer's own portal is. `manual_adjustment_hours` lets a human enter "the portal already
-    # confirms N more hours than I've logged here" without fabricating itemized activities to
-    # justify them (those hours were already accepted by the issuer directly).
+    # issuer's own portal is. `manual_adjustment_hours` holds the portal's own last-confirmed
+    # total for this credential (refreshed whenever you re-check the portal), not a flat
+    # add-on — the gap between that total and what's actually itemized here fills in
+    # automatically. That makes it self-correcting as activities get logged: approving a
+    # previously-adjustment-covered activity into the log shrinks the gap by the same amount,
+    # so the same portal hours are never counted twice.
     earned_logged = _sum_hours(activities, start=cycle_start, end=cycle_end)
-    earned_adjustment = credential_row["manual_adjustment_hours"] if "manual_adjustment_hours" in credential_row.keys() else None
-    earned_adjustment = earned_adjustment or 0
+    portal_confirmed = credential_row["manual_adjustment_hours"] if "manual_adjustment_hours" in credential_row.keys() else None
+    earned_adjustment = max(0, (portal_confirmed or 0) - earned_logged)
     earned = earned_logged + earned_adjustment
     pct = min(100, round(earned / total * 100)) if total else 0
 

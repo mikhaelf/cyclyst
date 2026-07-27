@@ -23,9 +23,12 @@ CREDENTIAL_COLUMNS = [
 ]
 
 # The issuer's own portal is the real system of record for CPE/PDU totals — this tracker is a
-# secondary aggregator. `manual_adjustment_hours` (credentials) and `manual_adjustment`
-# (categories, added in the same migration) let a human enter "the portal already confirms N
-# more hours than I've logged here" without fabricating itemized activities to justify them.
+# secondary aggregator. `manual_adjustment_hours` (credentials) holds the portal's own
+# last-confirmed total for the cycle; progress.py fills in only the gap versus what's actually
+# itemized in `activities`, so it never double-counts hours that later get logged for real (see
+# progress.py's compute_progress). `manual_adjustment` (categories, added in the same migration)
+# is still a flat add-on, not gap-based — fine today since no tracked category currently sets it,
+# but worth revisiting the same way if one starts to.
 MANUAL_ADJUSTMENT_COLUMN = ("manual_adjustment_hours", "REAL")
 
 SCHEMA = """

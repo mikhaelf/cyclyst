@@ -6,7 +6,7 @@ functions plus a couple of in-memory-SQLite checks, no real data/tracker.db invo
 import sqlite3
 import unittest
 
-from ce_tracker.calendar_ingest import _find_duplicate, _title_similarity, score_event, stage_candidates
+from ce_tracker.calendar_ingest import _find_duplicate, _score_duplicate, _title_similarity, score_event, stage_candidates
 from ce_tracker.db import SCHEMA
 
 
@@ -132,6 +132,37 @@ class DuplicateDetectionTests(unittest.TestCase):
         ref, score = dup
         self.assertEqual(ref, "activity:1")
         self.assertGreater(score, 0.6)
+
+    def test_matching_hours_boosts_score_above_title_alone(self):
+        self.conn.execute(
+            "INSERT INTO activities (date, provider, title, hours, category, applies, status) "
+            "VALUES ('2026-06-15', NULL, 'Cloud Security Symposium 2026', 3.0, NULL, 'cissp', 'logged')"
+        )
+        title_only = _score_duplicate(
+            {"title": "Cloud Security Symposium", "provider": None}, {"title": "Cloud Security Symposium 2026", "provider": None},
+        )
+        with_matching_hours = _find_duplicate(
+            self.conn,
+            {"id": "pdf:x", "date": "2026-06-15", "title": "Cloud Security Symposium", "provider": None, "hours_guess": 3.0},
+        )
+        self.assertIsNotNone(with_matching_hours)
+        self.assertGreater(with_matching_hours[1], title_only)
+
+    def test_large_hours_mismatch_pulls_score_down_despite_title_match(self):
+        self.conn.execute(
+            "INSERT INTO activities (date, provider, title, hours, category, applies, status) "
+            "VALUES ('2026-06-15', NULL, 'Cloud Security Symposium 2026', 1.0, NULL, 'cissp', 'logged')"
+        )
+        title_only = _score_duplicate(
+            {"title": "Cloud Security Symposium", "provider": None}, {"title": "Cloud Security Symposium 2026", "provider": None},
+        )
+        # candidate claims 8 hours against an existing 1-hour entry with a near-identical
+        # title — more than 50% apart, so the mismatch should outweigh the title match
+        with_mismatched_hours = _find_duplicate(
+            self.conn,
+            {"id": "pdf:x", "date": "2026-06-15", "title": "Cloud Security Symposium", "provider": None, "hours_guess": 8.0},
+        )
+        self.assertLess(with_mismatched_hours[1], title_only)
 
     def test_no_duplicate_when_dates_differ(self):
         self.conn.execute(

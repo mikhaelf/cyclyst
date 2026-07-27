@@ -111,14 +111,28 @@ class EarningMathTests(unittest.TestCase):
         result = compute_progress(_credential(), activities, [], today=TODAY)
         self.assertEqual(result["earned"], 5.0)
 
-    def test_manual_adjustment_folds_into_earned_but_stays_itemized(self):
+    def test_portal_confirmed_total_fills_gap_without_double_counting(self):
+        # manual_adjustment_hours is the portal's own last-confirmed total, not a flat
+        # add-on: only the gap versus what's actually logged fills in, so it never pushes
+        # the total past what the portal itself confirms.
         result = compute_progress(
             _credential(manual_adjustment_hours=10.0),
             [_activity("2025-06-01", 5.0)], [], today=TODAY,
         )
         self.assertEqual(result["earned_logged"], 5.0)
-        self.assertEqual(result["earned_adjustment"], 10.0)
-        self.assertEqual(result["earned"], 15.0)
+        self.assertEqual(result["earned_adjustment"], 5.0)  # gap: 10 confirmed - 5 logged
+        self.assertEqual(result["earned"], 10.0)
+
+    def test_portal_confirmed_total_adjustment_shrinks_to_zero_once_fully_logged(self):
+        # Once locally-itemized activities catch up to (or pass) the portal's confirmed
+        # total, the adjustment contributes nothing further — no double count, no negative gap.
+        result = compute_progress(
+            _credential(manual_adjustment_hours=10.0),
+            [_activity("2025-06-01", 12.0)], [], today=TODAY,
+        )
+        self.assertEqual(result["earned_logged"], 12.0)
+        self.assertEqual(result["earned_adjustment"], 0.0)
+        self.assertEqual(result["earned"], 12.0)
 
     def test_pct_rounds_and_caps_at_100(self):
         result = compute_progress(_credential(total=3), [_activity("2025-06-01", 2.0)], [], today=TODAY)
