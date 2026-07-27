@@ -60,6 +60,10 @@ per-credential progress, pace status, and audit-ready reports.
   Training form and it pre-fills date, hours, provider, and title where confidently found —
   local-only, no network call, no file ever saved to disk. You still review and save the
   form yourself.
+- **Bulk transcript PDF import:** upload one or more issuer-exported transcript PDFs (e.g.
+  ISC2's "Official CPE Transcript") from the Pending Review tab and every CE record found is
+  staged for review at once — local-only, same as certificate upload. Only tested against
+  ISC2's export so far; see [Transcript PDF import](#transcript-pdf-import-optional) below.
 - **Pending-review queue** for ingested candidates, with duplicate detection against your
   existing log and sticky dismissals (a dismissed event never resurfaces).
 - **Reports:** itemized CSV and audit-ready PDF exports scoped to a credential's current
@@ -261,6 +265,31 @@ deliberately unusual:
 Gmail ingestion (course-completion emails, registration receipts) is a planned follow-up
 and intentionally not built yet.
 
+## Transcript PDF import (optional)
+
+The Pending Review tab also accepts one or more issuer-exported transcript PDFs at once —
+ISC2's "Official CPE Transcript" export is the case this was built and tested against. Local
+extraction only, same posture as certificate upload auto-fill: no network call, nothing saved
+to disk beyond the parsed rows landing in Pending Review.
+
+- **Handles multi-record transcripts, not just single certificates.** Every dated CE row in
+  the file is extracted, including titles that wrap across multiple lines in the PDF.
+- **Merges duplicate rows within one document.** Some issuers print the same activity under
+  more than one heading in a single export — e.g. a concentration certification (ISSEP)
+  sharing its base credential's (CISSP) CPE pool prints that pool's activities once per
+  heading. These are recognized as the same activity, not staged twice.
+  "Rollover" credit lines (a carried-over balance, not a real activity) are reported in a
+  note instead of being staged as one.
+- **Skips near-certain duplicates automatically.** A row that's essentially identical — same
+  date, same title, same hours — to something already in your log or already awaiting review
+  isn't staged a second time. Anything less certain still stages, flagged, for you to check.
+- **⚠️ Not tested against every issuer.** This has only been validated against a real ISC2
+  transcript export. Other issuers format their transcripts differently — layout, date
+  format, how multi-credential sharing is represented, if at all — so a PDF from a different
+  provider may extract incompletely, extract nothing useful, or need more correction at
+  review than usual. Always check what actually got staged before approving it; nothing is
+  ever added to your log without that review step regardless.
+
 ## Architecture
 
 Single-language Python stack, chosen for hackability over ceremony:
@@ -282,6 +311,7 @@ ce_tracker/
   reports.py          CSV/PDF generation
   calendar_ingest.py  event scoring + staging CLI (pure stdlib)
   certificate_parse.py  local PDF text extraction + field heuristics for upload auto-fill
+  transcript_parse.py  bulk multi-record transcript PDF extraction + staging
   docs_content.py     in-app docs text
   templates/ static/  UI
 run.py                dev entry point
@@ -318,6 +348,10 @@ file.**
   certificates (image-only PDFs) aren't handled yet, and fields it isn't confident about are
   left blank rather than guessed. See `ce-cpe-tracker-design.md` §11 for the heuristic and a
   possible future LLM-based fallback (opt-in, not built).
+- **Transcript PDF import is only tested against ISC2's export.** The row-extraction rules
+  (table layout, date format, how a shared multi-credential pool is represented) were built
+  and validated against one real issuer's transcript. Other issuers' exports aren't
+  guaranteed to parse correctly, or at all — see `ce-cpe-tracker-design.md` §11a.
 - Single-user by design. No auth, no multi-tenancy — run it on your own machine.
 - The Flask dev server is fine for localhost use; put a real WSGI server (e.g. gunicorn)
   in front of it if you expose it beyond loopback.

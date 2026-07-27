@@ -34,6 +34,29 @@ DOCS_SECTIONS = [
         """,
     },
     {
+        "id": "import-transcript",
+        "title": "Import a transcript PDF",
+        "body": """
+            <ol class="docs-steps">
+                <li>Open any credential, then click the <strong>Pending Review</strong> tab.</li>
+                <li>Under <strong>Import Transcripts</strong>, choose one or more PDF transcripts
+                from an issuer — e.g. ISC2's "Official CPE Transcript" export — and click
+                <strong>Import Transcripts</strong>.</li>
+                <li>Every record found is staged into Pending Review, same as any other source —
+                nothing is added to your log automatically. Records that look like near-exact
+                duplicates of something already logged or already awaiting review are skipped
+                rather than staged again.</li>
+                <li>A "rollover" credit line (a carried-over balance from a prior cycle, not a real
+                activity) is reported in a note instead of being staged — consider it for a manual
+                adjustment on the credential instead.</li>
+            </ol>
+            <p class="docs-copy"><strong>Heads up:</strong> this has only been tested against
+            ISC2's transcript export. Other issuers format their transcripts differently, so a
+            PDF from another provider may extract incompletely, extract nothing, or need more
+            correction than usual at review — always check what got staged before approving it.</p>
+        """,
+    },
+    {
         "id": "review-pending",
         "title": "Review suggested activities",
         "body": """
