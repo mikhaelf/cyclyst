@@ -1,4 +1,4 @@
-"""Local-only certificate parsing for the "Add Training" upload assist.
+"""Local-only certificate parsing for the "Add Continuing Education" upload assist.
 
 First-pass, no network calls (see ce-cpe-tracker-design.md §11): extracts text from an
 uploaded PDF and applies heuristics to guess date/provider/hours/title. Anything not

@@ -3,7 +3,7 @@
     <div class="sidebar-title">CE Tracker</div>
     <button class="add-training-btn"
             hx-get="{{ url_for('main.new_activity_form', selected=credential.id if credential else '') }}"
-            hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">+ Add Training</button>
+            hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">+ Add Continuing Education</button>
     <button class="add-credential-btn"
             hx-get="{{ url_for('main.new_credential_form') }}"
             hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">+ Add Credential</button>

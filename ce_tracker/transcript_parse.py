@@ -1,5 +1,5 @@
 """Bulk multi-record PDF transcript parsing and staging (design doc §11a). Distinct from
-certificate_parse.py (one PDF -> one CE record, pre-filling the manual Add Training form):
+certificate_parse.py (one PDF -> one CE record, pre-filling the manual Add Continuing Education form):
 this handles an issuer-exported transcript PDF holding many CE rows at once (e.g. ISC2's
 "Official CPE Transcript" export), extracting every row and staging each one into
 pending_activities the same way §5/§5a do -- never a direct write to `activities`.
