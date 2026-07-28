@@ -1,6 +1,9 @@
 <div class="app-shell">
   <aside class="sidebar">
-    <div class="sidebar-title">Cyclyst</div>
+    <div class="sidebar-title">
+      <img class="sidebar-logo" src="{{ url_for('static', filename='logo.svg') }}" alt="" width="22" height="22">
+      Cyclyst
+    </div>
     <button class="add-training-btn"
             hx-get="{{ url_for('main.new_activity_form', selected=credential.id if credential else '') }}"
             hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">+ Add Continuing Education</button>
