@@ -97,6 +97,22 @@ CREATE TABLE IF NOT EXISTS calendar_ingest_runs (
     events_seen INTEGER,
     candidates_staged INTEGER
 );
+
+-- Per (activity, credential) issuer-portal submission ledger — see ce_tracker/portal_submit.py
+-- and ce-cpe-tracker-design.md §7a. A flat activities.status can't express "submitted to
+-- ISC2 but not IAPP" for an activity whose `applies` names multiple credentials; this tracks
+-- that per credential instead. Absence of a row means not yet submitted for that pair.
+CREATE TABLE IF NOT EXISTS activity_portal_submissions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    activity_id INTEGER NOT NULL REFERENCES activities(id),
+    credential_id TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'not_submitted', -- 'not_submitted' | 'submitted' | 'portal_confirmed'
+    submitted_date TEXT,
+    confirmation_id TEXT,
+    source TEXT, -- 'automation' | 'portal-existing' | 'manual'
+    recorded_at TEXT NOT NULL,
+    UNIQUE(activity_id, credential_id)
+);
 """
 
 

@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from . import progress
+from . import portal_submit, progress
 from .db import get_db
 
 STATUS_COLOR = {
@@ -176,7 +176,19 @@ def credential_view(row, conn):
             if row["badge_visibility"] == "public"
             else f"{row['badge_platform']} · Private"
         ),
+        # ISC2 submission automation (design doc §7a) — CISSP-only for v1. Read-only: this
+        # dashboard never submits anything itself, it just surfaces what a live Claude-in-Chrome
+        # session (via ce_tracker/portal_submit.py) would find with `list-ready`.
+        "submission_queue": (
+            [_submission_queue_row(a) for a in portal_submit.ready_to_submit(conn, "cissp")]
+            if row["id"] == "cissp"
+            else None
+        ),
     }
+
+
+def _submission_queue_row(row):
+    return {"date": row["date"], "title": row["title"], "hours_label": f"{row['hours']:g}h"}
 
 
 def sidebar_credentials(conn):

@@ -352,6 +352,18 @@
           {% endfor %}
         </div>
         {% endif %}
+        {% if credential.submission_queue %}
+        <div class="submission-queue">
+          <div class="submission-queue-title">Ready to submit to ISC2 ({{ credential.submission_queue|length }})</div>
+          {% for item in credential.submission_queue %}
+          <div class="submission-queue-row">
+            <span class="submission-queue-date">{{ item.date }}</span>
+            <span class="submission-queue-hours">{{ item.hours_label }}</span>
+            <span class="submission-queue-name">{{ item.title }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
 
       {% elif tab == 'activity' %}
         <div class="activity-toolbar">

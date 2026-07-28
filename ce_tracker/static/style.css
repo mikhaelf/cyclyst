@@ -228,6 +228,19 @@ html, body {
 .category-bar { height: 7px; background: #eaecf0; border-radius: 4px; overflow: hidden; }
 .category-bar-fill { height: 100%; border-radius: 4px; }
 
+.submission-queue {
+  margin-top: 22px; background: #f7f8fa; border: 1px solid #eaecf0; border-radius: 9px;
+  padding: 12px 16px;
+}
+.submission-queue-title { font: 600 12.5px -apple-system, sans-serif; color: #344054; margin-bottom: 8px; }
+.submission-queue-row {
+  display: flex; gap: 12px; font: 12.5px -apple-system, sans-serif; color: #475467;
+  padding: 4px 0; border-top: 1px solid #eaecf0;
+}
+.submission-queue-row:first-of-type { border-top: none; }
+.submission-queue-date { color: #667085; min-width: 80px; }
+.submission-queue-hours { color: #667085; min-width: 40px; }
+
 /* Activity tab: add-activity form */
 .activity-toolbar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
 
