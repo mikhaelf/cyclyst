@@ -11,3 +11,6 @@ data/
 
 # issuer handbook PDFs — third-party copyrighted reference material, not for redistribution
 Credential Providers/
+
+# personal demo/scratch data
+CE Demo/
