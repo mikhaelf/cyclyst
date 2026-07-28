@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A working Flask/SQLite web dashboard (the `ce_tracker/` package) for tracking CE/CPE renewal requirements across multiple professional credentials. It is in daily personal use and being prepared for open-source release — see `README.md` for user-facing docs and `PUBLISHING-CHECKLIST.md` for what remains before the repo goes public.
 
+**Public/display name: "Cyclyst"** (decided 2026-07-28, replacing the placeholder "CE Tracker" branding in the README title, page `<title>`, and sidebar header). This is a display-name rename only — the Python package stays `ce_tracker/`, imports, CLI invocations (`python -m ce_tracker...`), and tests are all unaffected. Don't conflate the two when reading old commits/docs that still say "CE Tracker" internally (e.g. this file's own prose above).
+
 Key documents:
 - `README.md` — user-facing: motivation, quickstart, usage, architecture.
 - `ce-cpe-tracker-design.md` — original system design. Its §2–§4 (per-issuer credential rules, data model, progress algorithm) remain **authoritative for business logic**; its §8 tech choices and §3 storage format (YAML+CSV) are superseded (see banner at its top and "Tech stack" below).

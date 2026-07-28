@@ -1,8 +1,13 @@
-# CE Tracker
+# Cyclyst
 
 A self-hosted dashboard for tracking continuing-education (CE/CPE/PDU) requirements across
 multiple professional certifications — local-first, private by default, and strictly
 human-in-the-loop.
+
+> "Life is like riding a bicycle. To keep your balance, you must keep moving" — Einstein,
+> in a letter to his son Eduard, February 5, 1930. Renewal cycles work the same way: the
+> credentials stay current as long as you keep moving through them. Cyclyst keeps you
+> balanced across all of them at once.
 
 > **Status:** working and in daily personal use, pre-1.0. Self-hosted only — there is no
 > hosted version, and your data never leaves your machine.
@@ -28,7 +33,7 @@ The usual answer is a spreadsheet that can't answer the only question that matte
 going to make every deadline at my current pace?"* — plus an annual scramble to reconstruct
 an itemized, evidence-backed record if an issuer audits you.
 
-CE Tracker replaces that with one local dashboard: enter each credential's actual rules
+Cyclyst replaces that with one local dashboard: enter each credential's actual rules
 once, log each activity once (tagged to every credential it applies to), and get computed
 per-credential progress, pace status, and audit-ready reports.
 
