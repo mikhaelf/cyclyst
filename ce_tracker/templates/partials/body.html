@@ -2,7 +2,7 @@
   <aside class="sidebar">
     <div class="sidebar-title">
       <img class="sidebar-logo" src="{{ url_for('static', filename='logo.svg') }}" alt="" width="22" height="22">
-      Cyclyst
+      Cyclyst <span class="beta-tag">BETA</span>
     </div>
     <button class="add-training-btn"
             hx-get="{{ url_for('main.new_activity_form', selected=credential.id if credential else '') }}"
@@ -51,6 +51,14 @@
         <span class="nav-icon">📘</span> Docs
       </div>
     </div>
+
+    <div class="sidebar-disclaimer"
+         hx-get="{{ url_for('main.docs_fragment', selected=credential.id if credential else '') }}"
+         hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">
+      Unofficial, unaffiliated tool for your own personal CE tracking — not a substitute for
+      the issuer's portal. Runs locally; nothing is sent to the developer. Nothing is saved or
+      submitted without your review. <span class="sidebar-disclaimer-link">Legal &amp; privacy →</span>
+    </div>
   </aside>
 
   <main class="detail-panel">
@@ -58,7 +66,7 @@
     <div class="docs-panel">
       <div class="docs-header" id="docs-top">
         <div class="detail-name">Docs</div>
-        <div class="detail-sub">What you can do in CE Tracker, step by step.</div>
+        <div class="detail-sub">What you can do in Cyclyst, step by step.</div>
       </div>
 
       <nav class="docs-toc" aria-label="Docs sections">

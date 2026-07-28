@@ -9,8 +9,18 @@ human-in-the-loop.
 > credentials stay current as long as you keep moving through them. Cyclyst keeps you
 > balanced across all of them at once.
 
-> **Status:** working and in daily personal use, pre-1.0. Self-hosted only — there is no
-> hosted version, and your data never leaves your machine.
+> **Status:** BETA — working and in daily personal use, pre-1.0. Expect rough edges. Self-hosted
+> only — there is no hosted version, and your data never leaves your machine.
+
+> **Unofficial tool, use at your own risk.** Cyclyst is an independent project, not
+> authorized, affiliated with, or endorsed by ISC2, ISACA, PMI, IAPP, or any other credential
+> issuer or vendor named in this repo — and it is not endorsed or recommended by any employer
+> or organization. It is intended for **one person tracking their own credentials**, not for
+> tracking or submitting CE on someone else's behalf. It runs entirely on your own machine
+> with your own accounts and logins — no hosted component, no telemetry, no data sent to the
+> developer. It's built to accelerate CE tracking, not to remove you from the loop: nothing is
+> saved to your record or submitted to an issuer's portal without your explicit review and
+> go-ahead each time. Full text: [`DISCLAIMER.md`](DISCLAIMER.md).
 
 ## The problem
 
@@ -447,6 +457,26 @@ file.**
   the project's first outbound network call, so off by default and disclosed clearly
 - Extend portal submission automation past ISC2/CISSP to other issuers, once a second one's
   portal shape has been mapped
+
+## Legal & disclaimers
+
+Cyclyst is BETA software, provided as-is with no warranty. Full disclaimer text (personal-
+use scope, no issuer affiliation/endorsement, privacy/security posture, and the human-in-the-
+loop principle behind the design) lives in [`DISCLAIMER.md`](DISCLAIMER.md) — read it before
+relying on this tool for a real renewal deadline. In short:
+
+- **Personal use, one principal.** Built for one person tracking their own credentials on
+  their own machine — not for tracking or submitting CE on someone else's behalf.
+- **Unofficial and unaffiliated.** Not authorized, sponsored, or officially supported by
+  ISC2, ISACA, PMI, IAPP, or any other issuer or vendor it references. Use at your own risk.
+- **Not institutionally endorsed.** No employer or professional body vouches for it; it's a
+  personal tool for staying ahead of your own deadlines.
+- **Private by construction.** No hosted component, no telemetry, no data sent to the
+  developer — everything runs on your machine against a local file.
+- **Human-in-the-loop by design.** It accelerates tracking, it doesn't delegate
+  accountability — every write to your record and every issuer-portal submission needs your
+  explicit review and go-ahead. You're responsible for confirming what gets submitted is
+  accurate.
 
 ## License
 

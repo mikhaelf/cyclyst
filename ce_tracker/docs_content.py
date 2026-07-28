@@ -97,4 +97,36 @@ DOCS_SECTIONS = [
             </ul>
         """,
     },
+    {
+        "id": "legal-privacy",
+        "title": "Legal, privacy & responsibility",
+        "body": """
+            <p class="docs-copy"><strong>BETA software.</strong> Expect rough edges. Back up
+            <code>data/tracker.db</code> before upgrading. Provided as-is, with no warranty —
+            see <code>DISCLAIMER.md</code> in the project repo for the full text.</p>
+            <ul class="docs-steps">
+                <li><strong>Personal use, one principal.</strong> Built for one person tracking
+                their own credentials on their own machine — not for tracking or submitting CE
+                on someone else's behalf.</li>
+                <li><strong>Unofficial and unaffiliated.</strong> Not authorized, sponsored, or
+                officially supported by ISC2, ISACA, PMI, IAPP, or any other issuer or vendor it
+                references. Portal forms and rules can change without notice. Use at your own
+                risk.</li>
+                <li><strong>Not institutionally endorsed.</strong> No employer or professional
+                body vouches for this tool; it exists to help you stay ahead of your own
+                deadlines.</li>
+                <li><strong>Private by construction.</strong> Runs entirely on your own machine
+                against a local database file. No hosted component, no telemetry, no analytics,
+                and nothing about your usage or your CE records is sent to the developer. Any
+                issuer-portal login happens in your own browser session under your own
+                account — this tool never sees or stores those credentials.</li>
+                <li><strong>Human-in-the-loop, not delegated accountability.</strong> This tool
+                accelerates tracking — it doesn't remove you from the loop. Every write to your
+                CE record and every issuer-portal submission needs your explicit review and
+                go-ahead each time; suggested categories or form mappings are suggestions, never
+                auto-applied. You're responsible for confirming that what gets saved or
+                submitted is accurate.</li>
+            </ul>
+        """,
+    },
 ]
