@@ -75,6 +75,10 @@ per-credential progress, pace status, and audit-ready reports.
   cycle window.
 - **Quality-of-life:** public badge links (Credly / Credential.net), archived credentials,
   in-app docs, in-place editing of everything — no hand-editing the database.
+- **ISC2 portal submission automation (CISSP):** a submission-tracking ledger plus a
+  human-supervised, one-record-at-a-time workflow for actually submitting approved activities
+  to ISC2's live CPE portal — never autonomous, never batched. See
+  [ISC2 portal submission automation](#isc2-portal-submission-automation-cissp-optional) below.
 
 ## Quickstart
 
@@ -295,6 +299,76 @@ to disk beyond the parsed rows landing in Pending Review.
   review than usual. Always check what actually got staged before approving it; nothing is
   ever added to your log without that review step regardless.
 
+## ISC2 portal submission automation (CISSP, optional)
+
+For ISC2 (CISSP), the tracker can go one step past tracking progress locally: it can help you
+actually get approved activities onto ISC2's live CPE portal, with a human confirming every
+single record before anything is submitted. Nothing here runs unattended:
+
+- `ce_tracker/portal_submit.py` keeps a ledger (`activity_portal_submissions`) of which
+  locally-logged activities have been submitted — or found already present — on ISC2's portal,
+  per activity *and* per credential, since one multi-`applies` activity can be submitted to one
+  issuer and not another.
+- `list-ready` finds activities that apply to a credential and have no ledger entry yet, and
+  prints a *suggested* ISC2 Category / CPE Type / Domain mapping based on keyword patterns —
+  always a suggestion for human review on the live form, never auto-filled or assumed.
+- Driving the actual browser is a live, human-supervised Claude-in-Chrome session: one record at
+  a time, with an explicit go/no-go before each submission. This is the project's hard rule —
+  no autonomous portal submission, ever, no batch auto-submit — made concrete.
+
+The example below uses fictional providers/events to show the shape of a real run:
+
+```
+$ python -m ce_tracker.portal_submit list-ready --credential cissp
+[41] 2025-01-14  2h    Northbridge Learning — "Threat Intel Roundup: Q1 Briefing"  (category: -)
+      suggested ISC2 mapping (confirm before submitting): Education > Online webinars, podcasts and other online materials | domain: ?
+[42] 2025-02-03  5h    Brightline Events — "Executive Risk & Governance Summit"  (category: -)
+      suggested ISC2 mapping (confirm before submitting): Education > Industry Conference | domain: Security and Risk Management
+[43] 2025-02-20  1.5h  Northbridge Learning — "Data Privacy: Recent Rulings"  (category: -)  [AUTO-REPORTING PROVIDER — check ISC2's live CPE List first; it may already be there under a different title/hours]
+      suggested ISC2 mapping (confirm before submitting): Education > Online webinars, podcasts and other online materials | domain: ?
+[44] 2025-03-11  4h    Fieldstone Ventures — "Fieldstone Con: Tech & Strategy"  (category: -)
+      suggested ISC2 mapping (confirm before submitting): Education > Industry Conference | domain: Security Architecture and Engineering
+```
+
+A "[AUTO-REPORTING PROVIDER]" flag (an editable list at the top of `portal_submit.py`) marks
+providers known to auto-report CPEs to ISC2 under their own partnership — not automatically a
+duplicate, but a strong enough signal that the mandatory live re-check deserves extra scrutiny:
+on the first real run, two activities from such a provider turned out to already be on ISC2's
+list, once under a different title and once with a different hour count.
+
+The Claude-in-Chrome session then re-checks ISC2's live "CPE List" for duplicates first, and
+walks each clear activity through ISC2's "Add New CPE" form (Dates → Category & Detail → Domain
+→ Review), pausing for an explicit go/no-go before the final, irreversible "Submit CPE" click.
+After each approved submission:
+
+```
+$ python -m ce_tracker.portal_submit record-submission --activity-id 42 --credential cissp \
+    --source automation --isc2-category Education --isc2-cpe-type "Industry Conference" \
+    --isc2-domain "Security and Risk Management"
+Recorded activity 42 as automation for cissp.
+```
+
+Once ISC2's own "record will update within the next 60 minutes" window has elapsed, a later
+session reconciles the ledger against a fresh live check:
+
+```
+$ python -m ce_tracker.portal_submit list-pending-reconcile --credential cissp
+[42] 2025-02-03  5h  Brightline Events — "Executive Risk & Governance Summit"  (submitted 2025-02-03, recorded 2025-02-03T14:02:11)
+
+$ python -m ce_tracker.portal_submit confirm-submission --activity-id 42 --credential cissp
+Confirmed activity 42 for cissp.
+```
+
+If ISC2's own record differs from what was logged locally — as happened for provider
+auto-reported entries on the first real run — `--isc2-hours` / `--isc2-title` correct the local
+activity to match: ISC2's accepted figure is the source of truth once something is actually live
+there, not what was originally logged.
+
+**Scope, honestly:** CISSP/ISC2 only for now (see `ce-cpe-tracker-design.md` §7a for the
+duplicate-prevention design and confirmation semantics); category/domain suggestions are
+heuristic and always reviewed by a human on the live form; and there is deliberately no way to
+run this without a live, supervised browser session on the other end.
+
 ## Architecture
 
 Single-language Python stack, chosen for hackability over ceremony:
@@ -371,8 +445,8 @@ file.**
   dependency — deferred until local PDF-text parsing proves useful enough to justify it)
 - Opt-in LLM-based fallback for certificate parsing when local heuristics miss — would be
   the project's first outbound network call, so off by default and disclosed clearly
-- Browser-assisted submission helper — pre-filling issuer portal forms with a required
-  human "go" per record, never batch auto-submit
+- Extend portal submission automation past ISC2/CISSP to other issuers, once a second one's
+  portal shape has been mapped
 
 ## License
 

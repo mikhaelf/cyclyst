@@ -110,7 +110,10 @@ CREATE TABLE IF NOT EXISTS activity_portal_submissions (
     submitted_date TEXT,
     confirmation_id TEXT,
     source TEXT, -- 'automation' | 'portal-existing' | 'manual'
-    recorded_at TEXT NOT NULL,
+    isc2_category TEXT,   -- e.g. "Education" — what was actually picked on ISC2's form
+    isc2_cpe_type TEXT,   -- e.g. "Industry Conference" — ISC2's activity-type dropdown value
+    isc2_domain TEXT,     -- e.g. "Security Operations" — ISC2's domain checkbox(es), comma-separated if multiple
+    recorded_at TEXT NOT NULL,  -- full timestamp (not just a date) — pending_reconciliation needs minute-level precision
     UNIQUE(activity_id, credential_id)
 );
 """
@@ -290,6 +293,19 @@ def _migrate_pending_activity_columns(conn):
         conn.execute("ALTER TABLE pending_activities ADD COLUMN duplicate_confidence REAL")
 
 
+def _migrate_portal_submission_isc2_columns(conn):
+    """Records what was actually picked on ISC2's own form (category/CPE-type/domain) per
+    ledger row, not just that a submission happened — otherwise that detail only ever
+    existed in a chat transcript. See ce-cpe-tracker-design.md §7a."""
+    existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(activity_portal_submissions)")}
+    if "isc2_category" not in existing_cols:
+        conn.execute("ALTER TABLE activity_portal_submissions ADD COLUMN isc2_category TEXT")
+    if "isc2_cpe_type" not in existing_cols:
+        conn.execute("ALTER TABLE activity_portal_submissions ADD COLUMN isc2_cpe_type TEXT")
+    if "isc2_domain" not in existing_cols:
+        conn.execute("ALTER TABLE activity_portal_submissions ADD COLUMN isc2_domain TEXT")
+
+
 def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = get_db()
@@ -301,6 +317,7 @@ def init_db():
     _migrate_grace_period_backfill(conn)
     _migrate_manual_adjustment_columns(conn)
     _migrate_pending_activity_columns(conn)
+    _migrate_portal_submission_isc2_columns(conn)
     conn.commit()
     conn.close()
 
