@@ -12,8 +12,8 @@ Steps to complete before flipping this repository public. Delete this file as th
   checklist's own later prose quoting the number. Force-pushed the rewritten `main`, then
   deleted the 7 other pushed branches that were carrying the same leak in their ancestry
   (all confirmed already squash-merged into `main` via PRs #2–#10, so nothing unique was
-  lost) plus the now-merged PR #11 source branch. Verified `git log --all -S "REDACTED_MEMBER_ID"` on the
-  fresh clone returns zero hits, and repo-renamed `agentic-ce-sync` → `cyclyst` right after
+  lost) plus the now-merged PR #11 source branch. Verified a pickaxe search for the leaked
+  value on the fresh clone returns zero hits, and repo-renamed `agentic-ce-sync` → `cyclyst` right after
   (still private). Note: other **local-only** worktrees on this machine that were checked out
   to the deleted branches still hold the pre-rewrite blobs until those worktrees are cleaned
   up too — not a publishing risk (nothing of GitHub's), just local hygiene.
