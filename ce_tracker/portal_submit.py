@@ -152,13 +152,19 @@ def main():
     parser = argparse.ArgumentParser(description="Track ISC2 CPE portal submission status for locally-approved activities.")
     sub = parser.add_subparsers(dest="command", required=True)
 
+    credential_help = "Credential id to check against, e.g. 'cissp' (default: %(default)s)."
+    activity_id_help = "The activities.id of the locally-logged activity, shown in list-ready's output."
+
     list_p = sub.add_parser("list-ready", help="List activities not yet submitted to the given credential's portal.")
-    list_p.add_argument("--credential", default="cissp")
+    list_p.add_argument("--credential", default="cissp", help=credential_help)
 
     rec_p = sub.add_parser("record-submission", help="Record that one activity was submitted (or already present).")
-    rec_p.add_argument("--activity-id", type=int, required=True)
-    rec_p.add_argument("--credential", default="cissp")
-    rec_p.add_argument("--source", required=True, choices=["automation", "portal-existing", "manual"])
+    rec_p.add_argument("--activity-id", type=int, required=True, help=activity_id_help)
+    rec_p.add_argument("--credential", default="cissp", help=credential_help)
+    rec_p.add_argument("--source", required=True, choices=["automation", "portal-existing", "manual"],
+                        help="'automation' = submitted live via a supervised browser session; "
+                             "'portal-existing' = found already on the portal (e.g. auto-reported by the "
+                             "provider), not submitted by us; 'manual' = submitted some other way.")
     rec_p.add_argument("--confirmation", help="Confirmation ID/reference the portal returned, if any.")
     rec_p.add_argument("--date", help="Submission date (ISO); defaults to today.")
     rec_p.add_argument("--isc2-category", help="ISC2 form Category actually picked, e.g. 'Education'.")
@@ -167,12 +173,12 @@ def main():
 
     pending_p = sub.add_parser("list-pending-reconcile",
                                 help="List automation submissions old enough (60+ min) to re-check against the live CPE List.")
-    pending_p.add_argument("--credential", default="cissp")
+    pending_p.add_argument("--credential", default="cissp", help=credential_help)
 
     confirm_p = sub.add_parser("confirm-submission",
                                 help="Mark a submitted activity portal_confirmed after finding it on the live CPE List.")
-    confirm_p.add_argument("--activity-id", type=int, required=True)
-    confirm_p.add_argument("--credential", default="cissp")
+    confirm_p.add_argument("--activity-id", type=int, required=True, help=activity_id_help)
+    confirm_p.add_argument("--credential", default="cissp", help=credential_help)
     confirm_p.add_argument("--isc2-hours", type=float, help="Correct local hours to match what ISC2 actually recorded, if different.")
     confirm_p.add_argument("--isc2-title", help="Correct local title to match what ISC2 actually recorded, if different.")
 

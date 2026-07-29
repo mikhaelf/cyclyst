@@ -402,6 +402,10 @@ duplicate-prevention design and confirmation semantics); category/domain suggest
 heuristic and always reviewed by a human on the live form; and there is deliberately no way to
 run this without a live, supervised browser session on the other end.
 
+Every flag on every subcommand above has its own `--help` text (`python -m ce_tracker.portal_submit
+<subcommand> --help`) — that's the full reference; the walkthrough above only covers the ones
+you'll use most.
+
 ## Architecture
 
 Single-language Python stack, chosen for hackability over ceremony:
