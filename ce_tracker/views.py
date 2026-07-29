@@ -176,12 +176,13 @@ def credential_view(row, conn):
             if row["badge_visibility"] == "public"
             else f"{row['badge_platform']} · Private"
         ),
-        # ISC2 submission automation (design doc §7a) — CISSP-only for v1. Read-only: this
-        # dashboard never submits anything itself, it just surfaces what a live Claude-in-Chrome
-        # session (via ce_tracker/portal_submit.py) would find with `list-ready`.
+        # Issuer-portal submission automation (design doc §7a/§7b) — CISSP and PMP for now,
+        # see portal_submit.MAPPING_SUGGESTERS for which credentials are supported. Read-only:
+        # this dashboard never submits anything itself, it just surfaces what a live
+        # Claude-in-Chrome session (via ce_tracker/portal_submit.py) would find with `list-ready`.
         "submission_queue": (
-            [_submission_queue_row(a) for a in portal_submit.ready_to_submit(conn, "cissp")]
-            if row["id"] == "cissp"
+            [_submission_queue_row(a) for a in portal_submit.ready_to_submit(conn, row["id"])]
+            if row["id"] in portal_submit.MAPPING_SUGGESTERS
             else None
         ),
     }

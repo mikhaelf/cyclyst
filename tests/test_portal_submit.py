@@ -1,5 +1,6 @@
-"""Tests for ce_tracker.portal_submit — the ISC2 net-new/duplicate-prevention ledger
-(design doc §7a). Pure in-memory-SQLite checks, no real data/tracker.db involved. Run with:
+"""Tests for ce_tracker.portal_submit — the issuer-portal net-new/duplicate-prevention ledger
+(design doc §7a/§7b), covering both ISC2 (CISSP) and PMI (PMP). Pure in-memory-SQLite checks,
+no real data/tracker.db involved. Run with:
     python -m unittest discover -s tests
 """
 
@@ -15,6 +16,7 @@ from ce_tracker.portal_submit import (
     ready_to_submit,
     record_submission,
     suggest_isc2_mapping,
+    suggest_pmi_mapping,
 )
 
 
@@ -61,6 +63,15 @@ class PortalSubmitTests(unittest.TestCase):
         ready = ready_to_submit(self.conn, "cissp")
         self.assertEqual([r["id"] for r in ready], [activity_id])
 
+    def test_pmp_ledger_isolated_from_cissp_on_same_multi_applies_activity(self):
+        # Same shape the real DB exercises: one activity applying to both cissp and pmp,
+        # already submitted to ISC2 — must still be net-new for PMP.
+        activity_id = self._insert_activity("cissp,pmp")
+        record_submission(self.conn, activity_id, "cissp", source="automation")
+        self.assertEqual(ready_to_submit(self.conn, "cissp"), [])
+        ready = ready_to_submit(self.conn, "pmp")
+        self.assertEqual([r["id"] for r in ready], [activity_id])
+
     def test_record_submission_is_idempotent(self):
         activity_id = self._insert_activity("cissp")
         record_submission(self.conn, activity_id, "cissp", source="automation", confirmation_id="ABC123")
@@ -80,19 +91,19 @@ class PortalSubmitTests(unittest.TestCase):
         ).fetchone()
         self.assertEqual(row["status"], "portal_confirmed")
 
-    def test_record_submission_stores_isc2_fields(self):
+    def test_record_submission_stores_submitted_fields(self):
         activity_id = self._insert_activity("cissp")
         record_submission(self.conn, activity_id, "cissp", source="automation",
-                           isc2_category="Education", isc2_cpe_type="Industry Conference",
-                           isc2_domain="Security and Risk Management")
+                           category="Education", cpe_type="Industry Conference",
+                           domain="Security and Risk Management")
         row = self.conn.execute(
-            "SELECT isc2_category, isc2_cpe_type, isc2_domain FROM activity_portal_submissions "
+            "SELECT submitted_category, submitted_cpe_type, submitted_domain FROM activity_portal_submissions "
             "WHERE activity_id = ? AND credential_id = 'cissp'",
             (activity_id,),
         ).fetchone()
-        self.assertEqual(row["isc2_category"], "Education")
-        self.assertEqual(row["isc2_cpe_type"], "Industry Conference")
-        self.assertEqual(row["isc2_domain"], "Security and Risk Management")
+        self.assertEqual(row["submitted_category"], "Education")
+        self.assertEqual(row["submitted_cpe_type"], "Industry Conference")
+        self.assertEqual(row["submitted_domain"], "Security and Risk Management")
 
     def test_suggest_isc2_mapping_conference_title(self):
         activity = {"title": "Fieldstone Ventures Con - Tech and strategy", "category": None}
@@ -114,11 +125,39 @@ class PortalSubmitTests(unittest.TestCase):
         self.assertIsNone(mapping["cpe_type"])
         self.assertIsNone(mapping["domain"])
 
+    def test_suggest_pmi_mapping_conference_title(self):
+        activity = {"title": "PMI Chapter Leadership Summit", "category": None}
+        mapping = suggest_pmi_mapping(activity)
+        self.assertEqual(mapping["category"], "Education")
+        self.assertEqual(mapping["cpe_type"], "Organization Meetings")
+        self.assertEqual(mapping["domain"], "Power Skills")
+
+    def test_suggest_pmi_mapping_webinar_title(self):
+        activity = {"title": "On-Demand Webinar: Agile Roadmapping", "category": None}
+        mapping = suggest_pmi_mapping(activity)
+        self.assertEqual(mapping["category"], "Education")
+        self.assertEqual(mapping["cpe_type"], "Online or Digital Media")
+        self.assertEqual(mapping["domain"], "Business Acumen")
+
+    def test_suggest_pmi_mapping_unmatched_returns_none(self):
+        activity = {"title": "Some Unlabeled Activity", "category": None}
+        mapping = suggest_pmi_mapping(activity)
+        self.assertIsNone(mapping["category"])
+        self.assertIsNone(mapping["cpe_type"])
+        self.assertIsNone(mapping["domain"])
+
     def test_is_auto_reporting_provider_case_insensitive(self):
-        self.assertTrue(is_auto_reporting_provider({"provider": "Northbridge Learning"}))
-        self.assertTrue(is_auto_reporting_provider({"provider": "northbridge learning"}))
-        self.assertFalse(is_auto_reporting_provider({"provider": "Fieldstone Ventures"}))
-        self.assertFalse(is_auto_reporting_provider({"provider": None}))
+        self.assertTrue(is_auto_reporting_provider({"provider": "Northbridge Learning"}, "cissp"))
+        self.assertTrue(is_auto_reporting_provider({"provider": "northbridge learning"}, "cissp"))
+        self.assertFalse(is_auto_reporting_provider({"provider": "Fieldstone Ventures"}, "cissp"))
+        self.assertFalse(is_auto_reporting_provider({"provider": None}, "cissp"))
+
+    def test_is_auto_reporting_provider_scoped_per_credential(self):
+        # ProjectManagement.com auto-reports to PMI, not ISC2 — same provider name must not
+        # trip the ISC2 flag, and Northbridge Learning (an ISC2 auto-reporter) must not trip the PMP flag.
+        self.assertTrue(is_auto_reporting_provider({"provider": "ProjectManagement.com"}, "pmp"))
+        self.assertFalse(is_auto_reporting_provider({"provider": "ProjectManagement.com"}, "cissp"))
+        self.assertFalse(is_auto_reporting_provider({"provider": "Northbridge Learning"}, "pmp"))
 
     def test_pending_reconciliation_excludes_recent_automation_submission(self):
         activity_id = self._insert_activity("cissp")
@@ -161,7 +200,7 @@ class PortalSubmitTests(unittest.TestCase):
     def test_confirm_submission_corrects_hours_and_title_on_mismatch(self):
         activity_id = self._insert_activity("cissp", title="AI Governance Symposium, Session")
         record_submission(self.conn, activity_id, "cissp", source="automation")
-        confirm_submission(self.conn, activity_id, "cissp", isc2_hours=4.0, isc2_title="Cedar Valley Symposium")
+        confirm_submission(self.conn, activity_id, "cissp", portal_hours=4.0, portal_title="Cedar Valley Symposium")
         row = self.conn.execute("SELECT hours, title FROM activities WHERE id = ?", (activity_id,)).fetchone()
         self.assertEqual(row["hours"], 4.0)
         self.assertEqual(row["title"], "Cedar Valley Symposium")

@@ -99,7 +99,7 @@ CREATE TABLE IF NOT EXISTS calendar_ingest_runs (
 );
 
 -- Per (activity, credential) issuer-portal submission ledger — see ce_tracker/portal_submit.py
--- and ce-cpe-tracker-design.md §7a. A flat activities.status can't express "submitted to
+-- and ce-cpe-tracker-design.md §7a/§7b. A flat activities.status can't express "submitted to
 -- ISC2 but not IAPP" for an activity whose `applies` names multiple credentials; this tracks
 -- that per credential instead. Absence of a row means not yet submitted for that pair.
 CREATE TABLE IF NOT EXISTS activity_portal_submissions (
@@ -110,9 +110,9 @@ CREATE TABLE IF NOT EXISTS activity_portal_submissions (
     submitted_date TEXT,
     confirmation_id TEXT,
     source TEXT, -- 'automation' | 'portal-existing' | 'manual'
-    isc2_category TEXT,   -- e.g. "Education" — what was actually picked on ISC2's form
-    isc2_cpe_type TEXT,   -- e.g. "Industry Conference" — ISC2's activity-type dropdown value
-    isc2_domain TEXT,     -- e.g. "Security Operations" — ISC2's domain checkbox(es), comma-separated if multiple
+    submitted_category TEXT,   -- e.g. "Education" — what was actually picked on the issuer's form
+    submitted_cpe_type TEXT,   -- e.g. "Industry Conference" — the issuer's activity-type dropdown value
+    submitted_domain TEXT,     -- e.g. "Security Operations" — the issuer's domain/talent-triangle pick(s), comma-separated if multiple
     recorded_at TEXT NOT NULL,  -- full timestamp (not just a date) — pending_reconciliation needs minute-level precision
     UNIQUE(activity_id, credential_id)
 );
@@ -302,17 +302,27 @@ def _migrate_pending_activity_breakdown_column(conn):
         conn.execute("ALTER TABLE pending_activities ADD COLUMN breakdown TEXT")
 
 
-def _migrate_portal_submission_isc2_columns(conn):
-    """Records what was actually picked on ISC2's own form (category/CPE-type/domain) per
-    ledger row, not just that a submission happened — otherwise that detail only ever
-    existed in a chat transcript. See ce-cpe-tracker-design.md §7a."""
+def _migrate_portal_submission_columns(conn):
+    """Records what was actually picked on the issuer's own submission form
+    (category/CPE-type/domain) per ledger row, not just that a submission happened —
+    otherwise that detail only ever existed in a chat transcript. Generic across issuers
+    (ISC2, PMI, ...) since one activity can be submitted to more than one portal — see
+    ce-cpe-tracker-design.md §7a/§7b. These columns were originally ISC2-only
+    (isc2_category/isc2_cpe_type/isc2_domain); renamed to the generic form here once PMI
+    needed the same three fields, so older databases get a RENAME COLUMN instead of a
+    fresh ADD COLUMN (existing ISC2 ledger rows keep their data)."""
     existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(activity_portal_submissions)")}
-    if "isc2_category" not in existing_cols:
-        conn.execute("ALTER TABLE activity_portal_submissions ADD COLUMN isc2_category TEXT")
-    if "isc2_cpe_type" not in existing_cols:
-        conn.execute("ALTER TABLE activity_portal_submissions ADD COLUMN isc2_cpe_type TEXT")
-    if "isc2_domain" not in existing_cols:
-        conn.execute("ALTER TABLE activity_portal_submissions ADD COLUMN isc2_domain TEXT")
+    for old_name, new_name in (
+        ("isc2_category", "submitted_category"),
+        ("isc2_cpe_type", "submitted_cpe_type"),
+        ("isc2_domain", "submitted_domain"),
+    ):
+        if new_name in existing_cols:
+            continue
+        if old_name in existing_cols:
+            conn.execute(f"ALTER TABLE activity_portal_submissions RENAME COLUMN {old_name} TO {new_name}")
+        else:
+            conn.execute(f"ALTER TABLE activity_portal_submissions ADD COLUMN {new_name} TEXT")
 
 
 def init_db():
@@ -327,7 +337,7 @@ def init_db():
     _migrate_manual_adjustment_columns(conn)
     _migrate_pending_activity_columns(conn)
     _migrate_pending_activity_breakdown_column(conn)
-    _migrate_portal_submission_isc2_columns(conn)
+    _migrate_portal_submission_columns(conn)
     conn.commit()
     conn.close()
 

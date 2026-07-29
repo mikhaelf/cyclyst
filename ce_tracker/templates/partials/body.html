@@ -365,7 +365,7 @@
         {% endif %}
         {% if credential.submission_queue %}
         <div class="submission-queue">
-          <div class="submission-queue-title">Ready to submit to ISC2 ({{ credential.submission_queue|length }})</div>
+          <div class="submission-queue-title">Ready to submit to {{ credential.issuer }} ({{ credential.submission_queue|length }})</div>
           {% for item in credential.submission_queue %}
           <div class="submission-queue-row">
             <span class="submission-queue-date">{{ item.date }}</span>
