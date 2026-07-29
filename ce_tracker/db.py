@@ -1,5 +1,6 @@
 import os
 import re
+import secrets
 import sqlite3
 from datetime import date, timedelta
 from pathlib import Path
@@ -7,6 +8,31 @@ from pathlib import Path
 # Overridable so tests and non-default setups can point at their own database file.
 # The default lives in the gitignored data/ directory — see README "Where your data lives".
 DB_PATH = Path(os.environ.get("CE_TRACKER_DB") or Path(__file__).resolve().parent.parent / "data" / "tracker.db")
+
+# Flask's SECRET_KEY, needed for CSRF token signing (see ce_tracker/__init__.py). Same
+# override precedence and storage location as DB_PATH: an env var for anyone who wants to set
+# it explicitly, otherwise a value generated once and persisted alongside the database so
+# tokens issued to an already-open tab survive a server restart instead of all failing CSRF
+# validation the moment the process comes back up with a different random key.
+SECRET_KEY_PATH = DB_PATH.parent / "secret_key"
+
+
+def get_or_create_secret_key():
+    env_key = os.environ.get("CE_TRACKER_SECRET_KEY")
+    if env_key:
+        return env_key
+
+    SECRET_KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if SECRET_KEY_PATH.exists():
+        return SECRET_KEY_PATH.read_text().strip()
+
+    key = secrets.token_hex(32)
+    SECRET_KEY_PATH.write_text(key)
+    try:
+        SECRET_KEY_PATH.chmod(0o600)
+    except OSError:
+        pass  # best-effort on platforms without POSIX permissions (e.g. Windows)
+    return key
 
 # New columns added to `credentials` for computed (not stored) progress tracking.
 # See ce-cpe-tracker-design.md §3/§9 for the source schema this maps to.

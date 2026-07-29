@@ -3,7 +3,7 @@ import io
 import re
 from datetime import date
 
-from flask import Blueprint, Response, render_template, request
+from flask import Blueprint, Response, current_app, render_template, request
 
 from . import agenda_parse, certificate_parse, progress, reports, transcript_parse, views
 from .db import get_db
@@ -990,3 +990,32 @@ def dismiss_pending(pending_id):
     conn.close()
 
     return render_template("partials/body.html", **_body_context(selected_id, tab))
+
+
+@bp.errorhandler(413)
+def upload_too_large(_error):
+    """MAX_CONTENT_LENGTH trips before a view function's own file handling ever runs — same
+    "never break on a user-input boundary" posture as parse_certificate's own try/except
+    around a corrupt/unparseable PDF: re-render the relevant tab with a friendly note instead
+    of Werkzeug's raw error page."""
+    selected_id = request.args.get("selected")
+    limit_mb = current_app.config["MAX_CONTENT_LENGTH"] // (1024 * 1024)
+    note = f"That upload was too large (over {limit_mb} MB) — try a smaller file, or fewer at once."
+
+    if request.endpoint == "main.parse_certificate":
+        context = _body_context(selected_id, "activity")
+        context["show_add_form"] = True
+        context["form_values"] = {
+            "date": date.today().isoformat(),
+            "applies": [context["credential"]["id"]] if context["credential"] else [],
+            "status": "logged",
+        }
+        context["certificate_parse_note"] = note
+        return render_template("partials/body.html", **context), 413
+
+    context = _body_context(selected_id, "pending")
+    if request.endpoint == "main.import_agenda":
+        context["agenda_import_note"] = note
+    else:
+        context["transcript_import_note"] = note
+    return render_template("partials/body.html", **context), 413
