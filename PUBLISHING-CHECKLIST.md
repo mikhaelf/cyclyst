@@ -25,10 +25,10 @@ Steps to complete before flipping this repository public. Delete this file as th
 - [x] **Choose a license** and add `LICENSE`. Decided 2026-07-28: MIT. The SaaS milestone
   is still only "under consideration," not committed, so the AGPL hedge wasn't worth the
   friction it adds for forkers; revisit only if SaaS actually gets green-lit.
-- [ ] **Confirm the private-data location as final** (gitignored `data/` inside the repo —
-  the de facto choice). It has to be settled before publishing because the README documents
-  it.
-- [ ] **Final sweep on the exact tree being published:**
+- [x] **Confirm the private-data location as final** (gitignored `data/` inside the repo —
+  the de facto choice). Decided 2026-05-13: keep it. Simplest, already working, already what
+  the README documents.
+- [x] **Final sweep on the exact tree being published:**
   ```bash
   git ls-files                          # nothing unexpected tracked
   git grep -inE 'mikhael|felker|@gmail|spreadsheets' -- .
@@ -40,12 +40,14 @@ Steps to complete before flipping this repository public. Delete this file as th
 
 ## Should do
 
-- [ ] **Decide what happens to `CLAUDE.md`.** It's tracked and would go public. It's
-  coherent as a contributor guide (and references `CLAUDE.local.md`, which is gitignored
-  and stays private), but re-read it with public eyes — e.g. the Google Sheet mention is in
-  the *local* file only (verified), but confirm nothing personal has crept in since.
-- [ ] **Decide whether `saas-migration-plan.md` ships publicly.** Nothing sensitive in it
-  (verified), but it reveals commercial plans; keeping it private is a legitimate choice.
+- [x] **Decide what happens to `CLAUDE.md`.** Decided 2026-05-13: make it private. Added to
+  `.gitignore`, untracked with `git rm --cached` (file stays on disk, just stops being
+  versioned — same treatment `CLAUDE.local.md` already had). Fixed the 3 dangling
+  `` `CLAUDE.md` `` references in `ce-cpe-tracker-design.md` to point at README.md's
+  Architecture / Calendar ingestion sections instead, so public readers aren't sent looking
+  for a file that isn't there.
+- [x] **Decide whether `saas-migration-plan.md` ships publicly.** Decided 2026-05-13: keep it
+  private. Same untracking treatment as `CLAUDE.md` above.
 - [x] **Add a README screenshot** taken in demo mode. Done 2026-07-28: two screenshots
   (`docs/screenshots/dashboard-overview.jpg`, `docs/screenshots/pending-review.jpg`) captured
   against `CE_TRACKER_DEMO=1`, fictional data only. Along the way, found and fixed a demo-seed
