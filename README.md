@@ -515,7 +515,10 @@ file.**
   guaranteed to parse correctly, or at all — see `ce-cpe-tracker-design.md` §11a.
 - Single-user by design. No auth, no multi-tenancy — run it on your own machine.
 - The Flask dev server is fine for localhost use; put a real WSGI server (e.g. gunicorn)
-  in front of it if you expose it beyond loopback.
+  in front of it if you expose it beyond loopback. By default `run.py` binds to `127.0.0.1`
+  only, so out of the box the app isn't reachable from another machine on your network at
+  all — this only becomes a concern if you deliberately rebind it (e.g. to `0.0.0.0`) or run
+  it somewhere (Docker, a VM, a cloud host) that maps its port out.
 
 ## Roadmap
 
