@@ -234,6 +234,11 @@ one directory removes all of it. Two things live outside it if you set them up:
 
 **Code sync:** push from one environment, `git pull` in another.
 
+**Upgrading:** after `git pull`, the next `python run.py` applies any schema changes to
+`data/tracker.db` automatically — no manual migration step needed. Back up `data/tracker.db`
+first (a plain file copy) since this is beta software and schema changes aren't rolled back if
+something goes wrong.
+
 **Data sync:** never through git. Copy `tracker.db` explicitly, or use separate
 `CE_TRACKER_DB` paths so environments do not accidentally share production data.
 
