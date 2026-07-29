@@ -57,6 +57,30 @@ DOCS_SECTIONS = [
         """,
     },
     {
+        "id": "import-agenda",
+        "title": "Import an event agenda PDF",
+        "body": """
+            <ol class="docs-steps">
+                <li>Open any credential, then click the <strong>Pending Review</strong> tab.</li>
+                <li>Under <strong>Import an event agenda PDF</strong>, choose a multi-session-day
+                conference or retreat schedule — not a certificate or issuer transcript — and
+                enter a <strong>Year</strong> only if the agenda's own dates don't include one.</li>
+                <li>Click <strong>Import Agenda</strong>. Unlike other imports, this stages
+                <em>one</em> aggregate candidate for the whole event — a suggested total hours
+                plus an itemized session-by-session breakdown to review — rather than one row
+                per session.</li>
+                <li>Meals, breaks, and other non-content sessions are excluded from the total
+                automatically; sessions with no resolvable end time are left out and marked
+                "duration unknown" rather than guessed. Always check the breakdown, and fill in
+                the provider and which credential(s) it applies to, before approving.</li>
+            </ol>
+            <p class="docs-copy"><strong>Heads up:</strong> only two agenda layouts are
+            supported, each validated against one real sample. A differently-formatted agenda
+            may extract incompletely or not at all — check what actually got staged before
+            approving it.</p>
+        """,
+    },
+    {
         "id": "review-pending",
         "title": "Review suggested activities",
         "body": """

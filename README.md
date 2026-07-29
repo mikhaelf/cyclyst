@@ -97,6 +97,11 @@ per-credential progress, pace status, and audit-ready reports.
   ISC2's "Official CPE Transcript") from the Pending Review tab and every CE record found is
   staged for review at once — local-only, same as certificate upload. Only tested against
   ISC2's export so far; see [Transcript PDF import](#transcript-pdf-import-optional) below.
+- **Agenda PDF import:** upload a multi-session-day conference or retreat agenda from the
+  Pending Review tab and it stages one aggregate candidate — a suggested total hours plus an
+  itemized session breakdown — for the whole event, rather than one row per session.
+  Local-only, same posture as certificate and transcript upload. Supports two agenda layouts
+  only; see [Agenda PDF import](#agenda-pdf-import-optional) below.
 - **Pending-review queue** for ingested candidates, with duplicate detection against your
   existing log and sticky dismissals (a dismissed event never resurfaces). Calendar
   ingestion itself is optional and requires a separate MCP-connected AI-assistant session
@@ -205,6 +210,17 @@ Example — isolated test database with demo data:
 ```bash
 CE_TRACKER_DEMO=1 CE_TRACKER_DB="$HOME/ce-tracker-test/tracker.db" python run.py
 ```
+
+### Uninstalling
+
+The app, its Python dependencies (`.venv/`), and your data (`data/tracker.db`,
+`data/secret_key`) all live inside the cloned repo directory by default — so deleting that
+one directory removes all of it. Two things live outside it if you set them up:
+
+- Any database you pointed `CE_TRACKER_DB` at outside the repo (e.g. per the "another macOS
+  user account" setup above) — remove that path separately.
+- Any shell aliases you added to `~/.zshrc` / `~/.bashrc` — remove those too, or they'll
+  point at a deleted directory.
 
 ### What is in git vs. what you rebuild locally
 
@@ -373,6 +389,34 @@ to disk beyond the parsed rows landing in Pending Review.
   provider may extract incompletely, extract nothing useful, or need more correction at
   review than usual. Always check what actually got staged before approving it; nothing is
   ever added to your log without that review step regardless.
+
+## Agenda PDF import (optional)
+
+The Pending Review tab also accepts a multi-session-day conference or retreat agenda PDF —
+distinct from a certificate or an issuer transcript. Local extraction only, same posture as
+certificate and transcript upload: no network call, nothing saved to disk beyond the staged
+candidate in Pending Review.
+
+- **Stages one aggregate activity per agenda, not one row per session.** A conference is
+  logged as a single activity — the itemized per-session breakdown is included for review,
+  but there's no "merge several approved rows into one activity" step, so staging session-
+  by-session isn't useful here.
+- **Non-content sessions (meals, breaks, receptions, workout blocks, etc.) are excluded
+  automatically** via an editable denylist (top of `ce_tracker/agenda_parse.py`) — everything
+  else is treated as a candidate and included in the suggested total, so review the breakdown
+  before approving.
+- **Sessions with no resolvable end time are skipped from the total**, not guessed — noted in
+  the breakdown as "duration unknown" rather than silently dropped.
+- **Provider is left blank.** Unlike a certificate's issuer line, an agenda's host isn't
+  reliably extractable across formats, so you fill it in at review, same as you already do
+  for calendar-ingested candidates.
+- **Only two agenda layouts are supported**, each validated against exactly one real sample:
+  day headers with no year and explicit start–end time ranges ("Monday | June 22" /
+  "8:40 AM - 9:30 AM Description"), or day headers with a year and single bulleted start
+  times ("Thursday, June 4, 2026" / "9:00 a.m. - Description", duration inferred from the
+  next session's start time). If the agenda's dates don't include a year, enter one in the
+  optional **Year** field before importing. A third layout isn't guaranteed to parse — check
+  what actually got staged before approving it.
 
 ## ISC2 portal submission automation (CISSP, optional, MCP-assisted)
 
