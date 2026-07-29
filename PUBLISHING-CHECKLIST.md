@@ -14,9 +14,14 @@ Steps to complete before flipping this repository public. Delete this file as th
   (all confirmed already squash-merged into `main` via PRs #2–#10, so nothing unique was
   lost) plus the now-merged PR #11 source branch. Verified a pickaxe search for the leaked
   value on the fresh clone returns zero hits, and repo-renamed `agentic-ce-sync` → `cyclyst` right after
-  (still private). Note: other **local-only** worktrees on this machine that were checked out
-  to the deleted branches still hold the pre-rewrite blobs until those worktrees are cleaned
-  up too — not a publishing risk (nothing of GitHub's), just local hygiene.
+  (still private). The other local worktrees that were checked out to the deleted branches
+  have since been removed too, and the local object store was gc'd — nothing on this machine
+  still references the pre-rewrite blobs.
+
+  One follow-up needed a second pass: a commit describing this scrub literally quoted the
+  leaked value as the argument to the verification command that checked for it, re-introducing
+  it right after removing it. Caught and fixed the same day — rewritten, force-pushed, and
+  re-verified clean.
 - [x] **Choose a license** and add `LICENSE`. Decided 2026-07-28: MIT. The SaaS milestone
   is still only "under consideration," not committed, so the AGPL hedge wasn't worth the
   friction it adds for forkers; revisit only if SaaS actually gets green-lit.
