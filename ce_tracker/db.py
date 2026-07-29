@@ -57,6 +57,18 @@ CREDENTIAL_COLUMNS = [
 # but worth revisiting the same way if one starts to.
 MANUAL_ADJUSTMENT_COLUMN = ("manual_adjustment_hours", "REAL")
 
+# Some issuers let hours/PDUs earned in the final stretch of the *prior* cycle count toward
+# this one instead, up to a per-credential cap and window length — confirmed for PMI via the
+# CCR Handbook (see ce-cpe-tracker-design.md §7b): "you may apply a portion of the PDUs to your
+# next cycle... only PDUs earned in the final year [12 months]." Design doc §3 already sketched
+# a `carryover_max_hours` field for AIGP (6-month window) before this was wired up, so both
+# fields are generic rather than PMI-specific. NULL means the issuer either has no such rule or
+# it hasn't been confirmed yet — never guess either value.
+CARRYOVER_COLUMNS = [
+    ("carryover_max_hours", "REAL"),
+    ("carryover_window_days", "INTEGER"),
+]
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS credentials (
     id TEXT PRIMARY KEY,
@@ -304,6 +316,21 @@ def _migrate_manual_adjustment_columns(conn):
         conn.execute("ALTER TABLE categories ADD COLUMN manual_adjustment REAL")
 
 
+def _migrate_carryover_columns(conn):
+    """See CARRYOVER_COLUMNS above. No backfill here except PMP, the one credential whose cap
+    and window are actually confirmed against its issuer's handbook (20 PDUs, final 12 months
+    — see ce-cpe-tracker-design.md §7b); every other credential stays NULL rather than assuming
+    a carryover rule that hasn't been checked."""
+    cred_cols = {row["name"] for row in conn.execute("PRAGMA table_info(credentials)")}
+    for col_name, col_def in CARRYOVER_COLUMNS:
+        if col_name not in cred_cols:
+            conn.execute(f"ALTER TABLE credentials ADD COLUMN {col_name} {col_def}")
+    conn.execute(
+        "UPDATE credentials SET carryover_max_hours = 20, carryover_window_days = 365 "
+        "WHERE id = 'pmp' AND carryover_max_hours IS NULL"
+    )
+
+
 def _migrate_pending_activity_columns(conn):
     """Adds the fields calendar (and any future) ingestion needs: `category` so a staged row
     can carry a real category through the review-before-approve form (see routes.py's
@@ -361,6 +388,7 @@ def init_db():
     _migrate_category_parent_column(conn)
     _migrate_grace_period_backfill(conn)
     _migrate_manual_adjustment_columns(conn)
+    _migrate_carryover_columns(conn)
     _migrate_pending_activity_columns(conn)
     _migrate_pending_activity_breakdown_column(conn)
     _migrate_portal_submission_columns(conn)

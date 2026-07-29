@@ -27,6 +27,39 @@ def _sum_hours(activities, start=None, end=None, category=None):
     return total
 
 
+def _carryover_window(cycle_start, window_days):
+    """Some issuers (confirmed: PMI, see ce-cpe-tracker-design.md §7b; sketched but unconfirmed
+    for IAPP/AIGP) let hours earned in the final stretch of the *prior* cycle count toward this
+    one instead, up to a per-credential cap (`credentials.carryover_max_hours`) and a
+    per-credential window length (`carryover_window_days` — PMI's is the final 12 months;
+    other issuers may define "final" differently, e.g. AIGP's design-doc sketch says 6). The
+    prior cycle's own boundaries aren't stored anywhere, so its end is assumed to be this
+    cycle's start (real cycles run back-to-back). The window ends the day *before* cycle_start
+    (not on it) so it can never overlap the current cycle's own [cycle_start, cycle_end]
+    window — both `_in_window` checks are inclusive on both ends, so sharing a boundary date
+    would double-count an activity logged exactly on cycle_start."""
+    start_d = date.fromisoformat(cycle_start)
+    window_start = start_d - timedelta(days=window_days)
+    window_end = start_d - timedelta(days=1)
+    return window_start.isoformat(), window_end.isoformat()
+
+
+def _carryover_factor(activities, cycle_start, cap, window_days):
+    """How much of the prior-cycle final-window total actually counts, as a 0-1 fraction of each
+    matching activity's hours. The cap is a single total across every category (that's how
+    PMI's handbook states it — "a portion of the PDUs", not a per-category cap), so when the raw
+    total exceeds the cap, every category's carryover contribution is scaled down by the same
+    factor rather than picking which specific activities count — the handbook doesn't document
+    that choice as deterministic either."""
+    if not cap or not window_days:
+        return None, 0.0
+    window = _carryover_window(cycle_start, window_days)
+    raw = _sum_hours(activities, start=window[0], end=window[1])
+    if raw <= 0:
+        return window, 0.0
+    return window, min(1.0, cap / raw)
+
+
 def _anniversary_window(cycle_start_date, today):
     """The [anniversary, anniversary+1yr) window of cycle_start_date's month/day that contains today."""
     start = date.fromisoformat(cycle_start_date)
@@ -40,7 +73,8 @@ def _anniversary_window(cycle_start_date, today):
     return anniv.isoformat(), window_end.isoformat()
 
 
-def _compute_category_results(activities, categories, cycle_start, cycle_end):
+def _compute_category_results(activities, categories, cycle_start, cycle_end,
+                                carryover_window=None, carryover_factor=0.0):
     """Category rules can nest (a category's `parent_id` points at another category row for
     the same credential) — e.g. PMI's Talent Triangle legs living inside an "Education"
     bucket, or ISC2's ISSEP sub-quota inside Group A (design doc §3's `category_rules` +
@@ -54,6 +88,11 @@ def _compute_category_results(activities, categories, cycle_start, cycle_end):
     own portal is the real system of record, and hours it already confirms don't need a
     locally-itemized activity to back them (see credential-level manual_adjustment_hours below
     for the same idea applied to the whole cycle total).
+
+    `carryover_window`/`carryover_factor` (see progress.compute_progress and
+    _carryover_factor) add each category's share of hours carried forward from the prior
+    cycle's final window, scaled by the same cap-derived factor used for the credential-level
+    total.
     """
     children_by_parent = {}
     for cat in categories:
@@ -63,6 +102,10 @@ def _compute_category_results(activities, categories, cycle_start, cycle_end):
 
     def direct_earned(cat):
         logged = _sum_hours(activities, start=cycle_start, end=cycle_end, category=cat["name"])
+        if carryover_window and carryover_factor:
+            logged += _sum_hours(
+                activities, start=carryover_window[0], end=carryover_window[1], category=cat["name"]
+            ) * carryover_factor
         adjustment = cat["manual_adjustment"] if "manual_adjustment" in cat.keys() else None
         return logged + (adjustment or 0)
 
@@ -106,7 +149,7 @@ def compute_progress(credential_row, activities, categories, today=None):
         return {
             "status": status, "pct": None, "earned": None, "days_left": days_left,
             "on_track": None, "annual_earned": None, "category_results": [], "grace_days_left": None,
-            "earned_logged": None, "earned_adjustment": None,
+            "earned_logged": None, "earned_adjustment": None, "carryover_earned": None,
         }
 
     if renewal_type != "cpe_hours":
@@ -114,7 +157,7 @@ def compute_progress(credential_row, activities, categories, today=None):
         return {
             "status": "reminder", "pct": None, "earned": None, "days_left": None,
             "on_track": None, "annual_earned": None, "category_results": [], "grace_days_left": None,
-            "earned_logged": None, "earned_adjustment": None,
+            "earned_logged": None, "earned_adjustment": None, "carryover_earned": None,
         }
 
     cycle_start = credential_row["cycle_start_date"]
@@ -131,7 +174,23 @@ def compute_progress(credential_row, activities, categories, today=None):
     earned_logged = _sum_hours(activities, start=cycle_start, end=cycle_end)
     portal_confirmed = credential_row["manual_adjustment_hours"] if "manual_adjustment_hours" in credential_row.keys() else None
     earned_adjustment = max(0, (portal_confirmed or 0) - earned_logged)
-    earned = earned_logged + earned_adjustment
+
+    # PDU/CE carryover (design doc §7b) — hours earned in the final window of the *prior* cycle
+    # that the issuer lets carry forward, capped per credential. Additive on top of
+    # earned_logged/earned_adjustment rather than gap-filled against them: unlike
+    # manual_adjustment_hours (which represents the *same* pool this cycle's activities are
+    # itemizing), carryover hours are a genuinely separate pool from a different cycle.
+    carryover_cap = credential_row["carryover_max_hours"] if "carryover_max_hours" in credential_row.keys() else None
+    carryover_window_days = credential_row["carryover_window_days"] if "carryover_window_days" in credential_row.keys() else None
+    carryover_window, carryover_factor = (
+        _carryover_factor(activities, cycle_start, carryover_cap, carryover_window_days)
+        if cycle_start else (None, 0.0)
+    )
+    carryover_earned = 0.0
+    if carryover_window and carryover_factor:
+        carryover_earned = _sum_hours(activities, start=carryover_window[0], end=carryover_window[1]) * carryover_factor
+
+    earned = earned_logged + earned_adjustment + carryover_earned
     pct = min(100, round(earned / total * 100)) if total else 0
 
     start_d = date.fromisoformat(cycle_start) if cycle_start else today
@@ -174,12 +233,15 @@ def compute_progress(credential_row, activities, categories, today=None):
             window_start, window_end = _anniversary_window(cycle_start, today)
         annual_earned = _sum_hours(activities, start=window_start, end=window_end)
 
-    category_results = _compute_category_results(activities, categories, cycle_start, cycle_end)
+    category_results = _compute_category_results(
+        activities, categories, cycle_start, cycle_end, carryover_window, carryover_factor
+    )
 
     return {
         "status": status, "pct": pct, "earned": earned, "days_left": days_left,
         "on_track": on_track, "annual_earned": annual_earned, "category_results": category_results,
         "grace_days_left": grace_days_left, "earned_logged": earned_logged, "earned_adjustment": earned_adjustment,
+        "carryover_earned": carryover_earned,
     }
 
 

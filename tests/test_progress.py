@@ -156,6 +156,91 @@ class EarningMathTests(unittest.TestCase):
         self.assertEqual(result["status"], "on-track")
 
 
+class CarryoverTests(unittest.TestCase):
+    # cycle_start_date is 2024-05-01 (from _credential's defaults). Tests set
+    # carryover_window_days=365 to match PMI's confirmed 12-month rule, giving a window of
+    # [2023-05-02, 2024-04-30] — the day *before* cycle_start, never cycle_start itself (see
+    # _carryover_window's boundary note).
+
+    def test_no_carryover_cap_means_pre_cycle_activities_never_count(self):
+        # Same shape as EarningMathTests.test_sums_hours_inside_cycle_window_only, but
+        # explicit that this is the carryover_max_hours=None, carryover_window_days=None (default) case.
+        result = compute_progress(
+            _credential(carryover_max_hours=None, carryover_window_days=None),
+            [_activity("2024-01-01", 5.0)], [], today=TODAY,
+        )
+        self.assertEqual(result["carryover_earned"], 0.0)
+        self.assertEqual(result["earned"], 0.0)
+
+    def test_carryover_within_cap_counts_fully_on_top_of_logged(self):
+        activities = [
+            _activity("2024-01-01", 5.0),   # prior-cycle final year — carryover-eligible
+            _activity("2025-06-01", 3.0),   # inside current cycle window
+        ]
+        result = compute_progress(_credential(carryover_max_hours=20.0, carryover_window_days=365), activities, [], today=TODAY)
+        self.assertEqual(result["earned_logged"], 3.0)
+        self.assertEqual(result["carryover_earned"], 5.0)
+        self.assertEqual(result["earned"], 8.0)
+
+    def test_activity_older_than_final_year_of_prior_cycle_is_excluded(self):
+        # 2022-01-01 is well over 365 days before cycle_start (2024-05-01) — outside even the
+        # carryover window, not just the current cycle's.
+        result = compute_progress(
+            _credential(carryover_max_hours=20.0, carryover_window_days=365),
+            [_activity("2022-01-01", 5.0)], [], today=TODAY,
+        )
+        self.assertEqual(result["carryover_earned"], 0.0)
+        self.assertEqual(result["earned"], 0.0)
+
+    def test_carryover_exceeding_cap_is_prorated_not_truncated_by_activity(self):
+        # Raw carryover-eligible total is 20 against a cap of 10 -> factor 0.5, applied
+        # uniformly rather than counting one activity fully and dropping the other.
+        activities = [
+            _activity("2024-01-01", 15.0),
+            _activity("2024-02-01", 5.0),
+        ]
+        result = compute_progress(_credential(carryover_max_hours=10.0, carryover_window_days=365), activities, [], today=TODAY)
+        self.assertEqual(result["carryover_earned"], 10.0)
+        self.assertEqual(result["earned"], 10.0)
+
+    def test_activity_exactly_on_cycle_start_counts_once_not_twice(self):
+        # cycle_start (2024-05-01) is the current cycle's own window start *and* would be the
+        # carryover window's naive end if that window were inclusive of cycle_start — this pins
+        # that it's only ever counted via earned_logged, never double-counted via carryover.
+        result = compute_progress(
+            _credential(carryover_max_hours=20.0, carryover_window_days=365),
+            [_activity("2024-05-01", 6.0)], [], today=TODAY,
+        )
+        self.assertEqual(result["earned_logged"], 6.0)
+        self.assertEqual(result["carryover_earned"], 0.0)
+        self.assertEqual(result["earned"], 6.0)
+
+    def test_carryover_contributes_to_category_rollup(self):
+        # Mirrors the real PMP case: PDUs earned in the final year of the prior cycle, tagged
+        # to a category, should roll forward into that same category's total this cycle.
+        giving_back = _category(1, "Giving Back", 25, rule_type="max")
+        activities = [_activity("2024-01-01", 16.0, category="Giving Back")]
+        result = compute_progress(
+            _credential(carryover_max_hours=20.0, carryover_window_days=365), activities, [giving_back], today=TODAY,
+        )
+        self.assertEqual(result["carryover_earned"], 16.0)
+        cat_result = next(c for c in result["category_results"] if c["name"] == "Giving Back")
+        self.assertEqual(cat_result["earned"], 16.0)
+        self.assertTrue(cat_result["ok"])  # 16 <= 25 max
+
+    def test_carryover_category_contribution_is_prorated_with_same_factor_as_total(self):
+        giving_back = _category(1, "Giving Back", 25, rule_type="max")
+        activities = [
+            _activity("2024-01-01", 15.0, category="Giving Back"),
+            _activity("2024-02-01", 5.0, category="Giving Back"),
+        ]
+        result = compute_progress(
+            _credential(carryover_max_hours=10.0, carryover_window_days=365), activities, [giving_back], today=TODAY,
+        )
+        cat_result = next(c for c in result["category_results"] if c["name"] == "Giving Back")
+        self.assertEqual(cat_result["earned"], 10.0)  # same 0.5 factor as the credential-level cap
+
+
 class OnTrackFormulaTests(unittest.TestCase):
     # 3-year cycle 2024-05-01 → 2027-04-30 is 1094 days; TODAY is day 805 (~73.6% elapsed),
     # so with total=120 the pace threshold is ~88.3 hours.

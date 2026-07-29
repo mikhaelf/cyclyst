@@ -99,10 +99,24 @@ def _earned_label(row, prog):
         return "No CE hours tracked for this credential."
     earned, total, unit = prog["earned"], row["total"], row["unit"]
     adjustment = prog.get("earned_adjustment") or 0
+    carryover = prog.get("carryover_earned") or 0
+    logged = prog["earned_logged"]
+    if adjustment and carryover:
+        return (
+            f"{earned:g} of {total:g} {unit} earned this cycle "
+            f"({logged:g} logged here + {adjustment:g} confirmed on {row['issuer']}'s platform "
+            f"+ {carryover:g} carried over from last cycle)"
+        )
+    if carryover:
+        # Transparency: distinguish hours logged in this cycle's own window from hours the
+        # issuer let carry forward from the prior cycle's final window (carryover_max_hours).
+        return (
+            f"{earned:g} of {total:g} {unit} earned this cycle "
+            f"({logged:g} logged here + {carryover:g} carried over from last cycle)"
+        )
     if adjustment:
         # Transparency: distinguish hours backed by a local activity from hours the issuer's
         # portal already confirms but this tracker never itemized (see manual_adjustment_hours).
-        logged = prog["earned_logged"]
         return (
             f"{earned:g} of {total:g} {unit} earned this cycle "
             f"({logged:g} logged here + {adjustment:g} confirmed on {row['issuer']}'s platform)"
