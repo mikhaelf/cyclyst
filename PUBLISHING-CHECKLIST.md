@@ -54,9 +54,16 @@ Steps to complete before flipping this repository public. Delete this file as th
   bug: one pending-review row was tagged `"gmail"` as its source, which doesn't exist as a
   real ingestion pipeline (only `calendar` and `transcript_pdf` do) — would have visibly
   contradicted the README's "Gmail ingestion... not built yet" line.
-- [ ] **Repo metadata:** name, description, topics (`cpe`, `continuing-education`,
-  `cissp`, `flask`, `htmx`, `self-hosted`), and disable features you won't tend (wiki,
-  projects).
+- [x] **Repo metadata:** done 2026-05-13 via `gh repo edit`: description set, topics added
+  (`cpe`, `continuing-education`, `cissp`, `flask`, `htmx`, `self-hosted`), wiki and projects
+  disabled. Name already handled by the `cyclyst` rename above.
+
+## Ready to publish
+
+Every item in **Blockers** and **Should do** is now checked off (2026-05-13). What's left in
+**Optional / can follow after publishing** is exactly that — optional, and fine to tackle
+after flipping this repo public. The remaining decision is purely a go/no-go call: when to
+flip `mikhaelf/cyclyst` from private to public. Nothing in this file is blocking that anymore.
 
 ## Optional / can follow after publishing
 
