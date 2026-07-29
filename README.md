@@ -10,7 +10,12 @@ human-in-the-loop.
 > balanced across all of them at once.
 
 > **Status:** BETA — working and in daily personal use, pre-1.0. Expect rough edges. Self-hosted
-> only — there is no hosted version, and your data never leaves your machine.
+> only — there is no hosted version. The core tracker's data never leaves your machine, but
+> two **optional** features do send data elsewhere: Calendar ingestion sends calendar data
+> through Google's API to a connected AI-assistant session, and ISC2 portal submission
+> automation runs through Claude for Chrome, which processes whatever's on the page during
+> that session. Neither is on by default. See [Prerequisites](#prerequisites) below before
+> using either.
 
 > **Unofficial tool, use at your own risk.** Cyclyst is an independent project, not
 > authorized, affiliated with, or endorsed by ISC2, ISACA, PMI, IAPP, or any other credential
@@ -107,6 +112,44 @@ per-credential progress, pace status, and audit-ready reports.
   MCP-connected browser-automation session (this repo never drives a browser on its own). See
   [ISC2 portal submission automation](#isc2-portal-submission-automation-cissp-optional-mcp-assisted)
   below.
+
+## Prerequisites
+
+**To run the core tracker** (dashboard, manual credential/activity entry, certificate
+upload, transcript import, reports): just Python 3.10+ — no accounts, no browser extensions,
+no sign-ups. See [Quickstart](#quickstart) below.
+
+**To use either optional MCP-assisted feature** — [Calendar
+ingestion](#calendar-ingestion-optional-mcp-assisted) or [ISC2 portal submission
+automation](#isc2-portal-submission-automation-cissp-optional-mcp-assisted) — you need more
+than the tech stack, and the privacy posture changes for that session. Neither feature is
+required for the core tracker to work, and neither is on unless you set it up and use it:
+
+- **An account with the credential issuer, already logged in in your browser** (e.g. an ISC2
+  account signed into `cpe.isc2.org` for portal submission). The automation drives your
+  existing logged-in session — it never stores, enters, or has access to your issuer-portal
+  password.
+- **Claude for Chrome, installed and with site permissions granted** for the portal(s) you'll
+  use it on (required for ISC2 portal submission automation; not needed for Calendar
+  ingestion). This is Anthropic's browser extension: once enabled on a page, it can read that
+  page's content and act on it (click, type, submit), and that content is processed by
+  Claude to do so. Read Claude for Chrome's own terms of use and documentation, and
+  understand what you're granting it access to, before enabling it on any page showing your
+  CE data or an issuer-portal session.
+- **An MCP-connected AI-assistant session** (Claude Code or claude.ai) with the connector the
+  feature needs attached: the Google Calendar connector for calendar ingestion, or the
+  Claude-in-Chrome browser-automation tool for portal submission. Attaching an MCP connector
+  grants that session its full scope for as long as it's attached — e.g. the Calendar
+  connector can read your whole calendar, not just events that look like CE, regardless of
+  how narrowly this repo's own code queries it. Know what a connector can see and do before
+  attaching it to a session that will touch your CE data.
+- **Awareness that data leaves your machine for the duration of that session.** Calendar
+  events pass through Google's API to the connected assistant session; whatever's on the
+  portal page passes through Claude for Chrome to Anthropic while it's processing that page.
+  This is a deliberate, opt-in trade for automation the core app doesn't need — see [Design
+  principles](#design-principles) — but it means the "your data never leaves your machine"
+  framing above only holds for the core tracker, not for these two optional features while
+  they're in use.
 
 ## Quickstart
 
