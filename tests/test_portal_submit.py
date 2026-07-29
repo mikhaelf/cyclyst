@@ -12,6 +12,7 @@ from ce_tracker.db import SCHEMA
 from ce_tracker.portal_submit import (
     confirm_submission,
     is_auto_reporting_provider,
+    isc2_credits,
     pending_reconciliation,
     ready_to_submit,
     record_submission,
@@ -124,6 +125,13 @@ class PortalSubmitTests(unittest.TestCase):
         self.assertIsNone(mapping["category"])
         self.assertIsNone(mapping["cpe_type"])
         self.assertIsNone(mapping["domain"])
+
+    def test_isc2_credits_rounds_down_to_quarter_hour(self):
+        self.assertEqual(isc2_credits(6.33), 6.25)
+
+    def test_isc2_credits_leaves_exact_quarter_hour_unchanged(self):
+        self.assertEqual(isc2_credits(6.25), 6.25)
+        self.assertEqual(isc2_credits(6.0), 6.0)
 
     def test_suggest_pmi_mapping_conference_title(self):
         activity = {"title": "PMI Chapter Leadership Summit", "category": None}

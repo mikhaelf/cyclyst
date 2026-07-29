@@ -20,6 +20,7 @@ until one happens.
 """
 
 import argparse
+import math
 from datetime import date, datetime, timedelta
 
 from .db import get_db
@@ -138,6 +139,14 @@ MAPPING_SUGGESTERS = {"cissp": suggest_isc2_mapping, "pmp": suggest_pmi_mapping}
 def is_auto_reporting_provider(activity, credential_id):
     provider = (activity["provider"] or "").strip().lower()
     return provider in AUTO_REPORTING_PROVIDERS.get(credential_id, set())
+
+
+def isc2_credits(hours):
+    """ISC2's Credits field only accepts values in 0.25 increments; local hours (e.g. imported
+    as HH:MM durations) don't always land on one. Rounds down, not to nearest — never claim
+    CE that wasn't earned, matching the hard "never guess in the credential's favor" posture
+    the rest of this module follows for category/domain."""
+    return math.floor(hours * 4) / 4
 
 
 def ready_to_submit(conn, credential_id="cissp"):
@@ -269,6 +278,10 @@ def main():
                 if mapping["category"] or mapping["domain"]:
                     print(f"      suggested mapping (confirm before submitting): "
                           f"{mapping['category'] or '?'} > {mapping['cpe_type'] or '?'} | domain: {mapping['domain'] or '?'}")
+            if args.credential == "cissp":
+                rounded = isc2_credits(r["hours"])
+                if rounded != r["hours"]:
+                    print(f"      hours not a quarter-hour multiple — ISC2 Credits field needs {rounded:g}h (rounded down from {r['hours']:g}h)")
 
     elif args.command == "record-submission":
         record_submission(conn, args.activity_id, args.credential, args.source, args.confirmation, args.date,
