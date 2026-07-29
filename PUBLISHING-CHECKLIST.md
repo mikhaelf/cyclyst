@@ -5,17 +5,18 @@ Steps to complete before flipping this repository public. Delete this file as th
 
 ## Blockers — must be done
 
-- [ ] **Scrub the leaked member ID from git history.** Commit `fae1bcc` committed a real
-  ISACA member ID (`REDACTED_MEMBER_ID`) as the member-ID form placeholder in
-  `ce_tracker/templates/partials/body.html`. The working tree is fixed (now `e.g. 123456`),
-  but the value is still reachable in history. Two options:
-  - **Recommended — publish with fresh history:** create the public repo from a single
-    squashed initial commit (`git checkout --orphan public && git commit`), keeping this
-    repo as the private full-history original. Simplest, zero risk of missing something,
-    and the public repo starts clean.
-  - Alternative: rewrite history in place with `git filter-repo --replace-text`, then
-    force-push. More fiddly; only worth it if preserving the commit-by-commit history
-    publicly matters.
+- [x] **Scrub the leaked member ID from git history.** Done 2026-05-13: rewrote history in
+  place with `git filter-repo --replace-text` (in a fresh standalone clone, not any of the
+  entangled worktrees) to replace the real ISACA member ID with `REDACTED_MEMBER_ID`
+  everywhere it appeared — both the original leak commit's `body.html` placeholder and this
+  checklist's own later prose quoting the number. Force-pushed the rewritten `main`, then
+  deleted the 7 other pushed branches that were carrying the same leak in their ancestry
+  (all confirmed already squash-merged into `main` via PRs #2–#10, so nothing unique was
+  lost) plus the now-merged PR #11 source branch. Verified `git log --all -S "REDACTED_MEMBER_ID"` on the
+  fresh clone returns zero hits, and repo-renamed `agentic-ce-sync` → `cyclyst` right after
+  (still private). Note: other **local-only** worktrees on this machine that were checked out
+  to the deleted branches still hold the pre-rewrite blobs until those worktrees are cleaned
+  up too — not a publishing risk (nothing of GitHub's), just local hygiene.
 - [x] **Choose a license** and add `LICENSE`. Decided 2026-07-28: MIT. The SaaS milestone
   is still only "under consideration," not committed, so the AGPL hedge wasn't worth the
   friction it adds for forkers; revisit only if SaaS actually gets green-lit.
@@ -29,7 +30,8 @@ Steps to complete before flipping this repository public. Delete this file as th
   git grep -in 'credly.com/badges/' -- . | grep -v example   # only fictional badge URLs
   git log --all --name-only --pretty=format: | sort -u   # data/, *.db never appear
   ```
-  Verified clean as of 2026-07-16 except for the member-ID history item above.
+  Re-verified clean 2026-05-13 after the history rewrite above (the only working-tree hit for
+  `mikhael|felker` is the LICENSE copyright line, which is expected and fine to publish).
 
 ## Should do
 

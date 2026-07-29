@@ -113,8 +113,8 @@ per-credential progress, pace status, and audit-ready reports.
 Requires Python 3.10+ (3.11+ recommended). No Node.js, no build step, no Docker required.
 
 ```bash
-git clone https://github.com/mikhaelf/agentic-ce-sync.git
-cd agentic-ce-sync
+git clone https://github.com/mikhaelf/cyclyst.git
+cd cyclyst
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -188,8 +188,8 @@ Safest for UI or feature testing — no real cert numbers or activity history.
 
 ```bash
 gh auth login   # or use HTTPS + a personal access token
-git clone https://github.com/mikhaelf/agentic-ce-sync.git
-cd agentic-ce-sync
+git clone https://github.com/mikhaelf/cyclyst.git
+cd cyclyst
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -208,15 +208,15 @@ Use this only when you intentionally want the same layout and records on the tes
 On the **source** account:
 
 ```bash
-cp /path/to/agentic-ce-sync/data/tracker.db /Users/Shared/ce-tracker-test.db
+cp /path/to/cyclyst/data/tracker.db /Users/Shared/ce-tracker-test.db
 chmod 644 /Users/Shared/ce-tracker-test.db
 ```
 
 On the **test** account:
 
 ```bash
-git clone https://github.com/mikhaelf/agentic-ce-sync.git
-cd agentic-ce-sync
+git clone https://github.com/mikhaelf/cyclyst.git
+cd cyclyst
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
@@ -232,11 +232,11 @@ Remove the file from `/Users/Shared/` when finished if it contains sensitive cer
 Add to `~/.zshrc` or `~/.bashrc` on any account:
 
 ```bash
-alias ce-tracker='cd ~/agentic-ce-sync && source .venv/bin/activate && python run.py'
-alias ce-tracker-demo='cd ~/agentic-ce-sync && source .venv/bin/activate && CE_TRACKER_DEMO=1 CE_TRACKER_DB="$HOME/ce-tracker-test/tracker.db" python run.py'
+alias ce-tracker='cd ~/cyclyst && source .venv/bin/activate && python run.py'
+alias ce-tracker-demo='cd ~/cyclyst && source .venv/bin/activate && CE_TRACKER_DEMO=1 CE_TRACKER_DB="$HOME/ce-tracker-test/tracker.db" python run.py'
 ```
 
-Adjust the `cd` path if the repo lives somewhere other than `~/agentic-ce-sync`.
+Adjust the `cd` path if the repo lives somewhere other than `~/cyclyst`.
 
 #### GitHub push note (email privacy)
 
