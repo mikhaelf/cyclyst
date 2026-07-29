@@ -293,6 +293,15 @@ def _migrate_pending_activity_columns(conn):
         conn.execute("ALTER TABLE pending_activities ADD COLUMN duplicate_confidence REAL")
 
 
+def _migrate_pending_activity_breakdown_column(conn):
+    """Adds the itemized included/excluded/unresolved-session breakdown agenda_parse.py
+    produces for a single aggregate candidate -- shown alongside the suggested total hours
+    so a human can see what was counted before approving, not just the number."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(pending_activities)")}
+    if "breakdown" not in cols:
+        conn.execute("ALTER TABLE pending_activities ADD COLUMN breakdown TEXT")
+
+
 def _migrate_portal_submission_isc2_columns(conn):
     """Records what was actually picked on ISC2's own form (category/CPE-type/domain) per
     ledger row, not just that a submission happened — otherwise that detail only ever
@@ -317,6 +326,7 @@ def init_db():
     _migrate_grace_period_backfill(conn)
     _migrate_manual_adjustment_columns(conn)
     _migrate_pending_activity_columns(conn)
+    _migrate_pending_activity_breakdown_column(conn)
     _migrate_portal_submission_isc2_columns(conn)
     conn.commit()
     conn.close()

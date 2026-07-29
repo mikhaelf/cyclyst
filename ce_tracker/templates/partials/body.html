@@ -489,6 +489,19 @@
         </form>
         {% if transcript_import_note %}<div class="form-note">{{ transcript_import_note }}</div>{% endif %}
 
+        <form class="certificate-upload-form"
+              hx-post="{{ url_for('main.import_agenda', selected=credential.id) }}"
+              hx-target="#app-body" hx-swap="innerHTML" hx-encoding="multipart/form-data">
+          <label>Import an event agenda PDF (a multi-session-day conference/retreat schedule, not a certificate or issuer transcript) — stages one suggested total for the whole event, with an itemized breakdown to review before approving
+            <input type="file" name="agenda" accept="application/pdf">
+          </label>
+          <label>Year (only needed if the agenda's own dates don't include one)
+            <input type="text" name="year" placeholder="e.g. 2026" size="4">
+          </label>
+          <button type="submit" class="btn-secondary">Import Agenda</button>
+        </form>
+        {% if agenda_import_note %}<div class="form-note">{{ agenda_import_note }}</div>{% endif %}
+
         {% if pending %}
           {% for p in pending %}
           <div class="pending-card">
@@ -498,6 +511,12 @@
               {% if p.applies %}<div class="pending-applies">Applies to: {{ p.applies|join(', ') }}</div>{% endif %}
               {% if p.flagged %}<div class="pending-flag">⚠ low-confidence match — verify before approving</div>{% endif %}
               {% if p.duplicate_pct %}<div class="pending-flag pending-duplicate">⚠ {{ p.duplicate_pct }}% likely duplicate of "{{ p.duplicate_label }}"</div>{% endif %}
+              {% if p.breakdown %}
+              <details class="pending-breakdown">
+                <summary>View breakdown</summary>
+                <pre>{{ p.breakdown }}</pre>
+              </details>
+              {% endif %}
             </div>
             <div class="pending-actions">
               <button class="approvebtn approve"

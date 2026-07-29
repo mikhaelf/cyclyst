@@ -5,7 +5,7 @@ from datetime import date
 
 from flask import Blueprint, Response, render_template, request
 
-from . import certificate_parse, progress, reports, transcript_parse, views
+from . import agenda_parse, certificate_parse, progress, reports, transcript_parse, views
 from .db import get_db
 from .docs_content import DOCS_SECTIONS
 
@@ -44,6 +44,7 @@ def _body_context(selected_id, tab):
         "form_errors": {},
         "certificate_parse_note": None,
         "transcript_import_note": None,
+        "agenda_import_note": None,
         "docs_view": False,
         "docs_sections": [],
         "show_badge_form": False,
@@ -446,6 +447,55 @@ def import_transcripts():
         parts.append(f"couldn't read: {', '.join(summary['file_errors'])}")
 
     context["transcript_import_note"] = "; ".join(parts) if parts else "No CE records found in the uploaded file(s)."
+    return render_template("partials/body.html", **context)
+
+
+@bp.route("/activities/import-agenda", methods=["POST"])
+def import_agenda():
+    """Event-agenda PDF upload (multi-session-day conference/retreat schedules, distinct
+    from a certificate or issuer transcript): stages ONE aggregate candidate with a suggested
+    total hours and an itemized breakdown via agenda_parse.parse()/stage() -- never a direct
+    write to activities. `year` is optional and only used when the agenda's own date headers
+    don't include one (see agenda_parse.py's Meridian Security-style vs Fieldstone Ventures-style formats)."""
+    selected_id = request.args.get("selected")
+    file_storage = request.files.get("agenda")
+    year_raw = (request.form.get("year") or "").strip()
+
+    if not file_storage or not file_storage.filename:
+        context = _body_context(selected_id, "pending")
+        context["agenda_import_note"] = "Choose a PDF agenda before importing."
+        return render_template("partials/body.html", **context)
+
+    default_year = None
+    if year_raw:
+        if not re.fullmatch(r"\d{4}", year_raw):
+            context = _body_context(selected_id, "pending")
+            context["agenda_import_note"] = f'"{year_raw}" doesn\'t look like a 4-digit year.'
+            return render_template("partials/body.html", **context)
+        default_year = int(year_raw)
+
+    candidate, error = agenda_parse.parse(file_storage, default_year=default_year)
+
+    if error:
+        note = error
+    else:
+        conn = get_db()
+        result = agenda_parse.stage(conn, candidate)
+        conn.close()
+        if result["skipped_exact_duplicate"]:
+            note = "Skipped as a near-certain duplicate of something already logged or already awaiting review."
+        elif result["already_staged"]:
+            note = "This agenda was already imported."
+        elif result["duplicate"]:
+            note = f"Staged for review, flagged as a possible duplicate ({candidate['title']}, {candidate['hours_guess']:g}h suggested)."
+        else:
+            note = (
+                f"Staged for review: {candidate['title']}, {candidate['hours_guess']:g}h "
+                "suggested — check the breakdown before approving."
+            )
+
+    context = _body_context(selected_id, "pending")
+    context["agenda_import_note"] = note
     return render_template("partials/body.html", **context)
 
 

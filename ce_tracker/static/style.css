@@ -331,6 +331,12 @@ html, body {
 .pending-applies { font: 11px -apple-system, sans-serif; color: #667085; margin-top: 3px; }
 .pending-flag { font: 11px -apple-system, sans-serif; color: #b54708; margin-top: 4px; }
 .pending-flag.pending-duplicate { color: #c1440e; }
+.pending-breakdown { margin-top: 6px; font: 11px -apple-system, sans-serif; color: #667085; }
+.pending-breakdown summary { cursor: pointer; color: #475467; }
+.pending-breakdown pre {
+  white-space: pre-wrap; word-break: break-word; margin: 6px 0 0; padding: 8px 10px;
+  background: #f9fafb; border-radius: 6px; font: 11px -apple-system, sans-serif;
+}
 .pending-actions { display: flex; gap: 6px; flex: none; }
 .approvebtn {
   border: none; font: 600 11.5px -apple-system, sans-serif;

@@ -260,6 +260,7 @@ def pending_view(conn):
             "category": row["category"],
             "applies": row["applies"].split(",") if row["applies"] else [],
             "source": row["source"],
+            "breakdown": row["breakdown"] if "breakdown" in row.keys() else None,
             "flagged": bool(row["flagged"]),
             "duplicate_pct": round(duplicate_confidence * 100) if duplicate_confidence else None,
             "duplicate_label": _duplicate_label(conn, row["duplicate_of"]) if duplicate_confidence else None,
