@@ -16,10 +16,9 @@ Steps to complete before flipping this repository public. Delete this file as th
   - Alternative: rewrite history in place with `git filter-repo --replace-text`, then
     force-push. More fiddly; only worth it if preserving the commit-by-commit history
     publicly matters.
-- [ ] **Choose a license** and add `LICENSE`. The real decision: MIT/Apache-2.0 lets anyone
-  (including a competitor) run a hosted version commercially; AGPL-3.0 keeps a future
-  hosted/SaaS option effectively exclusive to the author. If the SaaS milestone
-  (`saas-migration-plan.md`) is still live, lean AGPL; if pure portfolio/community, MIT.
+- [x] **Choose a license** and add `LICENSE`. Decided 2026-07-28: MIT. The SaaS milestone
+  is still only "under consideration," not committed, so the AGPL hedge wasn't worth the
+  friction it adds for forkers; revisit only if SaaS actually gets green-lit.
 - [ ] **Confirm the private-data location as final** (gitignored `data/` inside the repo —
   the de facto choice). It has to be settled before publishing because the README documents
   it.
@@ -40,9 +39,12 @@ Steps to complete before flipping this repository public. Delete this file as th
   the *local* file only (verified), but confirm nothing personal has crept in since.
 - [ ] **Decide whether `saas-migration-plan.md` ships publicly.** Nothing sensitive in it
   (verified), but it reveals commercial plans; keeping it private is a legitimate choice.
-- [ ] **Add a README screenshot** taken in demo mode
-  (`CE_TRACKER_DEMO=1 CE_TRACKER_DB=/tmp/ce-demo.db python run.py`) so no real data can
-  appear in it.
+- [x] **Add a README screenshot** taken in demo mode. Done 2026-07-28: two screenshots
+  (`docs/screenshots/dashboard-overview.jpg`, `docs/screenshots/pending-review.jpg`) captured
+  against `CE_TRACKER_DEMO=1`, fictional data only. Along the way, found and fixed a demo-seed
+  bug: one pending-review row was tagged `"gmail"` as its source, which doesn't exist as a
+  real ingestion pipeline (only `calendar` and `transcript_pdf` do) — would have visibly
+  contradicted the README's "Gmail ingestion... not built yet" line.
 - [ ] **Repo metadata:** name, description, topics (`cpe`, `continuing-education`,
   `cissp`, `flask`, `htmx`, `self-hosted`), and disable features you won't tend (wiki,
   projects).

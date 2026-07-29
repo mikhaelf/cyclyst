@@ -22,6 +22,19 @@ human-in-the-loop.
 > saved to your record or submitted to an issuer's portal without your explicit review and
 > go-ahead each time. Full text: [`DISCLAIMER.md`](DISCLAIMER.md).
 
+## Screenshots
+
+Both screenshots below are from `CE_TRACKER_DEMO=1` — fictional credentials and activities,
+not real data.
+
+**Per-credential progress**, computed live from cycle dates and logged hours:
+
+![CISSP credential overview showing a 9% progress ring, group minimums, and activities ready to submit to ISC2](docs/screenshots/dashboard-overview.jpg)
+
+**Pending Review queue**, staged from calendar ingestion and awaiting human approval:
+
+![Pending Review tab with three staged candidate activities, each with Review & Approve / Dismiss actions](docs/screenshots/pending-review.jpg)
+
 ## The problem
 
 If you hold more than one professional certification, you already know the mess:
@@ -80,15 +93,20 @@ per-credential progress, pace status, and audit-ready reports.
   staged for review at once — local-only, same as certificate upload. Only tested against
   ISC2's export so far; see [Transcript PDF import](#transcript-pdf-import-optional) below.
 - **Pending-review queue** for ingested candidates, with duplicate detection against your
-  existing log and sticky dismissals (a dismissed event never resurfaces).
+  existing log and sticky dismissals (a dismissed event never resurfaces). Calendar
+  ingestion itself is optional and requires a separate MCP-connected AI-assistant session
+  (this repo never talks to Google) — see [Calendar ingestion](#calendar-ingestion-optional-mcp-assisted)
+  below.
 - **Reports:** itemized CSV and audit-ready PDF exports scoped to a credential's current
   cycle window.
 - **Quality-of-life:** public badge links (Credly / Credential.net), archived credentials,
   in-app docs, in-place editing of everything — no hand-editing the database.
 - **ISC2 portal submission automation (CISSP):** a submission-tracking ledger plus a
   human-supervised, one-record-at-a-time workflow for actually submitting approved activities
-  to ISC2's live CPE portal — never autonomous, never batched. See
-  [ISC2 portal submission automation](#isc2-portal-submission-automation-cissp-optional) below.
+  to ISC2's live CPE portal — never autonomous, never batched, and requires a separate
+  MCP-connected browser-automation session (this repo never drives a browser on its own). See
+  [ISC2 portal submission automation](#isc2-portal-submission-automation-cissp-optional-mcp-assisted)
+  below.
 
 ## Quickstart
 
@@ -255,16 +273,18 @@ author email until you rewrite history (usually unnecessary once the first push 
 
 The in-app **Docs** page (📘 in the sidebar) covers the same ground from inside the tool.
 
-## Calendar ingestion (optional, AI-assisted)
+## Calendar ingestion (optional, MCP-assisted)
 
 The tracker can scan your Google Calendar for events that look like CE activities —
 conferences, webinars, chapter meetings, trainings — and stage them for review. Its shape is
-deliberately unusual:
+deliberately unusual, and requires a separate tool this repo does not provide:
 
 - **The app itself never talks to Google.** There's no API client, no OAuth flow, no stored
-  tokens. You (or an AI assistant session that already has calendar access, e.g. Claude
-  with the Google Calendar connector) export events to a JSON file, then hand that file to
-  a pure-Python CLI:
+  tokens, and nothing in this repo will fetch your calendar on its own. Instead, a live AI
+  assistant session with calendar access — e.g. Claude Code or claude.ai with the Google
+  Calendar MCP (Model Context Protocol) connector enabled — reads your calendar and exports
+  events to a JSON file. You then hand that file to this repo's pure-Python CLI, which does
+  all the scoring/staging locally with no further network calls:
 
   ```bash
   python -m ce_tracker.calendar_ingest --events-file events.json
@@ -309,11 +329,13 @@ to disk beyond the parsed rows landing in Pending Review.
   review than usual. Always check what actually got staged before approving it; nothing is
   ever added to your log without that review step regardless.
 
-## ISC2 portal submission automation (CISSP, optional)
+## ISC2 portal submission automation (CISSP, optional, MCP-assisted)
 
 For ISC2 (CISSP), the tracker can go one step past tracking progress locally: it can help you
 actually get approved activities onto ISC2's live CPE portal, with a human confirming every
-single record before anything is submitted. Nothing here runs unattended:
+single record before anything is submitted. Like calendar ingestion above, this repo doesn't
+do the submitting itself — it requires a separate AI-assistant session with browser access.
+Nothing here runs unattended:
 
 - `ce_tracker/portal_submit.py` keeps a ledger (`activity_portal_submissions`) of which
   locally-logged activities have been submitted — or found already present — on ISC2's portal,
@@ -322,8 +344,9 @@ single record before anything is submitted. Nothing here runs unattended:
 - `list-ready` finds activities that apply to a credential and have no ledger entry yet, and
   prints a *suggested* ISC2 Category / CPE Type / Domain mapping based on keyword patterns —
   always a suggestion for human review on the live form, never auto-filled or assumed.
-- Driving the actual browser is a live, human-supervised Claude-in-Chrome session: one record at
-  a time, with an explicit go/no-go before each submission. This is the project's hard rule —
+- Driving the actual browser is a live, human-supervised session using an MCP-connected
+  browser-automation tool (e.g. Claude Code's Claude-in-Chrome extension): one record at a
+  time, with an explicit go/no-go before each submission. This is the project's hard rule —
   no autonomous portal submission, ever, no batch auto-submit — made concrete.
 
 The example below uses fictional providers/events to show the shape of a real run:
@@ -480,5 +503,4 @@ relying on this tool for a real renewal deadline. In short:
 
 ## License
 
-Not yet chosen — this repository is being prepared for public release. A license file will
-be added before publication.
+[MIT](LICENSE) — see the `LICENSE` file. Use it, fork it, run it commercially; no warranty.

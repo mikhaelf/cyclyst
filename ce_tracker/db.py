@@ -401,7 +401,7 @@ def seed_db():
     )
 
     pending = [
-        ("p1", "2026-07-08", "Coursera", "Responsible AI Certificate", 5, "aigp,cissp", "gmail", 0),
+        ("p1", "2026-07-08", "Coursera", "Responsible AI Certificate", 5, "aigp,cissp", "calendar", 0),
         ("p2", "2026-07-05", "ISC2", "Security Congress registration", 12, "cissp", "calendar", 0),
         ("p3", "2026-06-29", "Local Meetup", '"Book Club" calendar event', 1, "", "calendar", 1),
     ]
