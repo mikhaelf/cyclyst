@@ -12,7 +12,7 @@ human-in-the-loop.
 > **Status:** BETA — working and in daily personal use, pre-1.0. Expect rough edges. Self-hosted
 > only — there is no hosted version. The core tracker's data never leaves your machine, but
 > two **optional** features do send data elsewhere: Calendar ingestion sends calendar data
-> through Google's API to a connected AI-assistant session, and ISC2 portal submission
+> through Google's API to a connected AI-assistant session, and portal submission
 > automation runs through Claude for Chrome, which processes whatever's on the page during
 > that session. Neither is on by default. See [Prerequisites](#prerequisites) below before
 > using either.
@@ -34,7 +34,7 @@ not real data.
 
 **Per-credential progress**, computed live from cycle dates and logged hours:
 
-![CISSP credential overview showing a 9% progress ring, group minimums, and activities ready to submit to ISC2](docs/screenshots/dashboard-overview.jpg)
+![CISSP credential overview showing a 9% progress ring, group minimums, and activities ready to submit to the issuer's portal](docs/screenshots/dashboard-overview.jpg)
 
 **Pending Review queue**, staged from calendar ingestion and awaiting human approval:
 
@@ -114,17 +114,18 @@ per-credential progress, pace status, and audit-ready reports.
   archiving never deletes anything or affects progress totals, reports, or duplicate
   detection. See [Activity Log retention](#activity-log-retention-optional) below.
 - **"Since your last run" summary:** a dismissible banner on startup summarizing issuer-portal
-  submissions recorded (via the CISSP submission automation below) since the app was last
+  submissions recorded (via the portal submission automation below) since the app was last
   started — e.g. "2 CEs submitted to ISC2 (CISSP)." See [Since your last run](#since-your-last-run-summary)
   below.
 - **Quality-of-life:** public badge links (Credly / Credential.net), archived credentials,
   in-app docs, in-place editing of everything — no hand-editing the database.
-- **ISC2 portal submission automation (CISSP):** a submission-tracking ledger plus a
-  human-supervised, one-record-at-a-time workflow for actually submitting approved activities
-  to ISC2's live CPE portal — never autonomous, never batched, and requires a separate
-  MCP-connected browser-automation session (this repo never drives a browser on its own). See
-  [ISC2 portal submission automation](#isc2-portal-submission-automation-cissp-optional-mcp-assisted)
-  below.
+- **Portal submission automation (ISC2/CISSP and PMI/PMP so far):** a submission-tracking
+  ledger plus a human-supervised, one-record-at-a-time workflow for actually submitting
+  approved activities to an issuer's live CPE/PDU portal — never autonomous, never batched,
+  and requires a separate MCP-connected browser-automation session (this repo never drives a
+  browser on its own). The ledger and CLI are issuer-generic; only the category/domain
+  mapping heuristics are per-issuer, and each new issuer needs its own added. See [Portal
+  submission automation](#portal-submission-automation-optional-mcp-assisted) below.
 
 ## Prerequisites
 
@@ -133,22 +134,22 @@ upload, transcript import, reports): just Python 3.10+ — no accounts, no brows
 no sign-ups. See [Quickstart](#quickstart) below.
 
 **To use either optional MCP-assisted feature** — [Calendar
-ingestion](#calendar-ingestion-optional-mcp-assisted) or [ISC2 portal submission
-automation](#isc2-portal-submission-automation-cissp-optional-mcp-assisted) — you need more
+ingestion](#calendar-ingestion-optional-mcp-assisted) or [Portal submission
+automation](#portal-submission-automation-optional-mcp-assisted) — you need more
 than the tech stack, and the privacy posture changes for that session. Neither feature is
 required for the core tracker to work, and neither is on unless you set it up and use it:
 
 - **An account with the credential issuer, already logged in in your browser** (e.g. an ISC2
-  account signed into `cpe.isc2.org` for portal submission). The automation drives your
-  existing logged-in session — it never stores, enters, or has access to your issuer-portal
-  password.
+  account signed into `cpe.isc2.org`, or a PMI account signed into `ccrs.pmi.org`, for portal
+  submission). The automation drives your existing logged-in session — it never stores,
+  enters, or has access to your issuer-portal password.
 - **Claude for Chrome, installed and with site permissions granted** for the portal(s) you'll
-  use it on (required for ISC2 portal submission automation; not needed for Calendar
-  ingestion). This is Anthropic's browser extension: once enabled on a page, it can read that
-  page's content and act on it (click, type, submit), and that content is processed by
-  Claude to do so. Read Claude for Chrome's own terms of use and documentation, and
-  understand what you're granting it access to, before enabling it on any page showing your
-  CE data or an issuer-portal session.
+  use it on (required for portal submission automation; not needed for Calendar ingestion).
+  This is Anthropic's browser extension: once enabled on a page, it can read that page's
+  content and act on it (click, type, submit), and that content is processed by Claude to do
+  so. Read Claude for Chrome's own terms of use and documentation, and understand what you're
+  granting it access to, before enabling it on any page showing your CE data or an
+  issuer-portal session.
 - **An MCP-connected AI-assistant session** (Claude Code or claude.ai) with the connector the
   feature needs attached: the Google Calendar connector for calendar ingestion, or the
   Claude-in-Chrome browser-automation tool for portal submission. Attaching an MCP connector
@@ -463,11 +464,11 @@ startup or scheduled purge.
 
 ## "Since your last run" summary
 
-A banner appears on startup summarizing issuer-portal submissions recorded (via [ISC2 portal
-submission automation](#isc2-portal-submission-automation-cissp-optional-mcp-assisted) below)
-since the app was last started — e.g. "Since your last run: 2 CEs submitted to ISC2 (CISSP)."
-Nothing shows if there's nothing new, and nothing shows on the very first run ever (there's
-no "since" to compare against yet).
+A banner appears on startup summarizing issuer-portal submissions recorded (via [Portal
+submission automation](#portal-submission-automation-optional-mcp-assisted) below), grouped
+per credential/issuer, since the app was last started — e.g. "Since your last run: 2 CEs
+submitted to ISC2 (CISSP), 1 PDU submitted to PMI (PMP)." Nothing shows if there's nothing
+new, and nothing shows on the very first run ever (there's no "since" to compare against yet).
 
 - **× dismisses it for the rest of this run** — reload or navigate and it stays gone, but it
   comes back fresh on the next `python run.py`.
@@ -477,60 +478,64 @@ no "since" to compare against yet).
 - **Turning it back on** after choosing "Never show me again" is done from the in-app Docs
   page (📘 in the sidebar) — there's a "Turn back on" button there whenever the summary is off.
 
-## ISC2 portal submission automation (CISSP, optional, MCP-assisted)
+## Portal submission automation (optional, MCP-assisted)
 
-For ISC2 (CISSP), the tracker can go one step past tracking progress locally: it can help you
-actually get approved activities onto ISC2's live CPE portal, with a human confirming every
-single record before anything is submitted. Like calendar ingestion above, this repo doesn't
-do the submitting itself — it requires a separate AI-assistant session with browser access.
-Nothing here runs unattended:
+For issuers it's been mapped to — ISC2 (CISSP) and PMI (PMP) so far — the tracker can go one
+step past tracking progress locally: it can help you actually get approved activities onto
+that issuer's live CPE/PDU portal, with a human confirming every single record before anything
+is submitted. Like calendar ingestion above, this repo doesn't do the submitting itself — it
+requires a separate AI-assistant session with browser access. Nothing here runs unattended:
 
 - `ce_tracker/portal_submit.py` keeps a ledger (`activity_portal_submissions`) of which
-  locally-logged activities have been submitted — or found already present — on ISC2's portal,
-  per activity *and* per credential, since one multi-`applies` activity can be submitted to one
-  issuer and not another.
-- `list-ready` finds activities that apply to a credential and have no ledger entry yet, and
-  prints a *suggested* ISC2 Category / CPE Type / Domain mapping based on keyword patterns —
-  always a suggestion for human review on the live form, never auto-filled or assumed.
+  locally-logged activities have been submitted — or found already present — on an issuer's
+  portal, per activity *and* per credential, since one multi-`applies` activity can be
+  submitted to one issuer and not another. The ledger and its query functions are
+  issuer-generic; only the category/domain mapping heuristics below are per-issuer.
+- `list-ready --credential <cissp|pmp>` finds activities that apply to a credential and have
+  no ledger entry yet, and prints a *suggested* Category / CPE-or-PDU-Type / Domain mapping
+  based on keyword patterns — always a suggestion for human review on the live form, never
+  auto-filled or assumed.
 - Driving the actual browser is a live, human-supervised session using an MCP-connected
   browser-automation tool (e.g. Claude Code's Claude-in-Chrome extension): one record at a
   time, with an explicit go/no-go before each submission. This is the project's hard rule —
   no autonomous portal submission, ever, no batch auto-submit — made concrete.
 
-The example below uses fictional providers/events to show the shape of a real run:
+The example below uses fictional providers/events to show the shape of a real ISC2 run:
 
 ```
 $ python -m ce_tracker.portal_submit list-ready --credential cissp
 [41] 2025-01-14  2h    Northbridge Learning — "Threat Intel Roundup: Q1 Briefing"  (category: -)
-      suggested ISC2 mapping (confirm before submitting): Education > Online webinars, podcasts and other online materials | domain: ?
+      suggested mapping (confirm before submitting): Education > Online webinars, podcasts and other online materials | domain: ?
 [42] 2025-02-03  5h    Brightline Events — "Executive Risk & Governance Summit"  (category: -)
-      suggested ISC2 mapping (confirm before submitting): Education > Industry Conference | domain: Security and Risk Management
-[43] 2025-02-20  1.5h  Northbridge Learning — "Data Privacy: Recent Rulings"  (category: -)  [AUTO-REPORTING PROVIDER — check ISC2's live CPE List first; it may already be there under a different title/hours]
-      suggested ISC2 mapping (confirm before submitting): Education > Online webinars, podcasts and other online materials | domain: ?
+      suggested mapping (confirm before submitting): Education > Industry Conference | domain: Security and Risk Management
+[43] 2025-02-20  1.5h  Northbridge Learning — "Data Privacy: Recent Rulings"  (category: -)  [AUTO-REPORTING PROVIDER — check the portal's live CPE/PDU list first; it may already be there under a different title/hours]
+      suggested mapping (confirm before submitting): Education > Online webinars, podcasts and other online materials | domain: ?
 [44] 2025-03-11  4h    Fieldstone Ventures — "Fieldstone Con: Tech & Strategy"  (category: -)
-      suggested ISC2 mapping (confirm before submitting): Education > Industry Conference | domain: Security Architecture and Engineering
+      suggested mapping (confirm before submitting): Education > Industry Conference | domain: Security Architecture and Engineering
 ```
 
-A "[AUTO-REPORTING PROVIDER]" flag (an editable list at the top of `portal_submit.py`) marks
-providers known to auto-report CPEs to ISC2 under their own partnership — not automatically a
-duplicate, but a strong enough signal that the mandatory live re-check deserves extra scrutiny:
-on the first real run, two activities from such a provider turned out to already be on ISC2's
-list, once under a different title and once with a different hour count.
+A "[AUTO-REPORTING PROVIDER]" flag (an editable, per-issuer list at the top of
+`portal_submit.py` — e.g. Northbridge Learning for ISC2, ProjectManagement.com for PMI) marks providers known
+to auto-report credits to that issuer under their own partnership or account link — not
+automatically a duplicate, but a strong enough signal that the mandatory live re-check
+deserves extra scrutiny: on the first real ISC2 run, two activities from such a provider
+turned out to already be on ISC2's list, once under a different title and once with a
+different hour count.
 
-The Claude-in-Chrome session then re-checks ISC2's live "CPE List" for duplicates first, and
-walks each clear activity through ISC2's "Add New CPE" form (Dates → Category & Detail → Domain
-→ Review), pausing for an explicit go/no-go before the final, irreversible "Submit CPE" click.
-After each approved submission:
+The Claude-in-Chrome session then re-checks the portal's live CPE/PDU list for duplicates
+first, and walks each clear activity through the issuer's own "add new record" form, pausing
+for an explicit go/no-go before the final, irreversible submit click. After each approved
+submission:
 
 ```
 $ python -m ce_tracker.portal_submit record-submission --activity-id 42 --credential cissp \
-    --source automation --isc2-category Education --isc2-cpe-type "Industry Conference" \
-    --isc2-domain "Security and Risk Management"
+    --source automation --category Education --cpe-type "Industry Conference" \
+    --domain "Security and Risk Management"
 Recorded activity 42 as automation for cissp.
 ```
 
-Once ISC2's own "record will update within the next 60 minutes" window has elapsed, a later
-session reconciles the ledger against a fresh live check:
+Once the portal's own "give it a bit to update" window has elapsed (ISC2 states ~60 minutes;
+this varies by issuer), a later session reconciles the ledger against a fresh live check:
 
 ```
 $ python -m ce_tracker.portal_submit list-pending-reconcile --credential cissp
@@ -540,15 +545,21 @@ $ python -m ce_tracker.portal_submit confirm-submission --activity-id 42 --crede
 Confirmed activity 42 for cissp.
 ```
 
-If ISC2's own record differs from what was logged locally — as happened for provider
-auto-reported entries on the first real run — `--isc2-hours` / `--isc2-title` correct the local
-activity to match: ISC2's accepted figure is the source of truth once something is actually live
-there, not what was originally logged.
+If the portal's own record differs from what was logged locally — as happened for provider
+auto-reported entries on the first real ISC2 run — `--portal-hours` / `--portal-title` correct
+the local activity to match: the portal's accepted figure is the source of truth once
+something is actually live there, not what was originally logged.
 
-**Scope, honestly:** CISSP/ISC2 only for now (see `ce-cpe-tracker-design.md` §7a for the
-duplicate-prevention design and confirmation semantics); category/domain suggestions are
-heuristic and always reviewed by a human on the live form; and there is deliberately no way to
-run this without a live, supervised browser session on the other end.
+**Scope, honestly:** ISC2/CISSP is the only mapping validated against a real live run so far
+(see `CLAUDE.local.md` for that account); PMI/PMP mapping (`suggest_pmi_mapping`) is built
+from PMI's CCR Handbook but hasn't had a first supervised run against `ccrs.pmi.org` yet, so
+treat its suggestions as a rougher starting point until that happens. See
+`ce-cpe-tracker-design.md` §7a/§7b for the duplicate-prevention design and confirmation
+semantics per issuer. Category/domain suggestions are always heuristic and always reviewed by
+a human on the live form, and there is deliberately no way to run any of this without a live,
+supervised browser session on the other end. Adding a third issuer means adding its own
+mapping function and wiring it into `MAPPING_SUGGESTERS` — the ledger, CLI, and dashboard
+section need no changes.
 
 Every flag on every subcommand above has its own `--help` text (`python -m ce_tracker.portal_submit
 <subcommand> --help`) — that's the full reference; the walkthrough above only covers the ones
@@ -633,7 +644,9 @@ file.**
   dependency — deferred until local PDF-text parsing proves useful enough to justify it)
 - Opt-in LLM-based fallback for certificate parsing when local heuristics miss — would be
   the project's first outbound network call, so off by default and disclosed clearly
-- Extend portal submission automation past ISC2/CISSP to other issuers, once a second one's
+- A first human-supervised run of PMI/PMP portal submission against the real `ccrs.pmi.org`
+  form, to validate `suggest_pmi_mapping()` the way ISC2's mapping was validated live
+- Extend portal submission automation to further issuers (e.g. IAPP) once a third one's
   portal shape has been mapped
 
 ## Legal & disclaimers
