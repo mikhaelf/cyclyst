@@ -16,9 +16,9 @@ the page, and write them to a JSON file shaped like:
         "platform": "credential.net",  # or "credly"
         "name": "Certified Information Privacy Technologist (CIPT)",
         "issuer": "The IAPP",
-        "url": "https://www.credential.net/example-cipt-credential-id",
-        "issued_date": "2025-07-01",   # ISO date, or null if not shown/known
-        "expires_date": "2027-06-30"   # ISO date, or null if "does not expire"
+        "url": "https://www.credential.net/example-cipt",
+        "issued_date": "2024-01-01",   # ISO date, or null if not shown/known
+        "expires_date": "2026-01-01"   # ISO date, or null if "does not expire"
       },
       ...
     ]

@@ -663,9 +663,9 @@ explicit yes for that specific record.
        "platform": "credential.net",
        "name": "Certified Information Privacy Technologist (CIPT)",
        "issuer": "The IAPP",
-       "url": "https://www.credential.net/example-cipt-credential-id",
-       "issued_date": "2025-07-01",
-       "expires_date": "2027-06-30"
+       "url": "https://www.credential.net/example-cipt",
+       "issued_date": "2024-01-01",
+       "expires_date": "2026-01-01"
      }
    ]
    ```
@@ -676,18 +676,18 @@ explicit yes for that specific record.
    ```
    LINKED, BUT NAME LOOKS UNRELATED (double-check this is really the right badge):
      [gcp] GCP Cloud GenAI Leader -> badge titled "Platform Leader Certification"
-         https://www.credly.com/badges/example-genai-leader-badge-id
+         https://www.credly.com/badges/example-gcp-cloud-digital-leader
 
    WRONG LINK (stored badge_url points elsewhere):
      [cipt] CIPT
-         currently: https://www.credential.net/example-cred-1-...
-         should be: https://www.credential.net/51bd00c6-...
+         currently: https://www.credential.net/example-cipt-stale
+         should be: https://www.credential.net/example-cipt
 
    MISSING LINK (badge_url empty):
-     [cipp-us] CIPP/US -> https://www.credential.net/example-cred-2-...
+     [cipp-us] CIPP/US -> https://www.credential.net/example-cipp-us
 
    NEW / UNTRACKED CREDENTIAL:
-     Cloud GenAI Leader Certification (Google Cloud) -> https://www.credly.com/badges/example-cred-3-...
+     Cloud GenAI Leader Certification (Google Cloud) -> https://www.credly.com/badges/example-genai-leader
    ```
 3. **Apply what you want, one record at a time:**
    ```bash
