@@ -618,6 +618,84 @@ Every flag on every subcommand above has its own `--help` text (`python -m ce_tr
 <subcommand> --help`) — that's the full reference; the walkthrough above only covers the ones
 you'll use most.
 
+## Public-profile badge sync (optional, MCP-assisted)
+
+If you keep a public credential wallet — an [Accredible](https://www.credential.net)/Credential.net
+profile, a [Credly](https://www.credly.com) profile, or both — this can seed a fresh install's
+`credentials` table from it, or periodically catch drift: stale links, links that quietly point
+at the wrong badge, or credentials you've earned that never got added locally. Same shape as the
+other two optional features: nothing here fetches anything itself, and nothing writes without an
+explicit yes for that specific record.
+
+- `ce_tracker/profile_sync.py`'s `diff_badges()` compares a list of scraped badges against
+  non-archived `credentials` rows — by exact badge link first, then by issuer + fuzzy name
+  match — and classifies each one: already correct, wrong link, missing link, untracked
+  credential, or ambiguous (two rows are close enough matches that guessing would be unsafe, so
+  it's left for you to resolve instead). It also flags the case where a link is technically
+  valid but opens a badge whose title doesn't resemble the row's name — real bug this caught:
+  one credential's stored link resolved fine, just to a *different, genuinely valid* badge than
+  the row claimed to be.
+- Both platforms are JS-rendered and blocked a plain scripted fetch outright (403) during
+  development, so — like Calendar ingestion — gathering the badge list is always a live,
+  human-supervised AI-assistant session's job, not something this repo automates unattended.
+- Nothing is written by `diff`. `apply` walks each finding one at a time and asks before
+  touching the database — same "explicit go per record, no batch auto-apply" rule as portal
+  submission.
+
+### Running a sync
+
+1. **Open a Claude Code or claude.ai session with Claude-in-Chrome enabled** and ask it to visit
+   your public credential.net and/or Credly profile URLs and collect each badge's name, issuer,
+   link, and issued/expiration dates into a JSON file shaped like:
+   ```json
+   [
+     {
+       "platform": "credential.net",
+       "name": "Certified Information Privacy Technologist (CIPT)",
+       "issuer": "The IAPP",
+       "url": "https://www.credential.net/example-cipt-credential-id",
+       "issued_date": "2025-07-01",
+       "expires_date": "2027-06-30"
+     }
+   ]
+   ```
+2. **Review the diff before changing anything:**
+   ```bash
+   python -m ce_tracker.profile_sync diff --file badges.json
+   ```
+   ```
+   LINKED, BUT NAME LOOKS UNRELATED (double-check this is really the right badge):
+     [gcp] GCP Cloud GenAI Leader -> badge titled "Platform Leader Certification"
+         https://www.credly.com/badges/example-genai-leader-badge-id
+
+   WRONG LINK (stored badge_url points elsewhere):
+     [cipt] CIPT
+         currently: https://www.credential.net/example-cred-1-...
+         should be: https://www.credential.net/51bd00c6-...
+
+   MISSING LINK (badge_url empty):
+     [cipp-us] CIPP/US -> https://www.credential.net/example-cred-2-...
+
+   NEW / UNTRACKED CREDENTIAL:
+     Cloud GenAI Leader Certification (Google Cloud) -> https://www.credly.com/badges/example-cred-3-...
+   ```
+3. **Apply what you want, one record at a time:**
+   ```bash
+   python -m ce_tracker.profile_sync apply --file badges.json
+   ```
+   Each wrong/missing link and each new-credential candidate gets its own `[y/N]` prompt before
+   anything is written. A new credential is inserted with conservative defaults
+   (`renewal_type='exam'`, just the badge link and expiration) — go refine it (cycle totals,
+   member ID, cert number) through the normal Edit Credential form afterward. Name-mismatch and
+   ambiguous findings are never auto-applied; resolve those by hand.
+
+**Scope, honestly:** matching is issuer + fuzzy-name heuristics, same "suggest, never guess"
+posture as the portal-submission mapping suggesters — it's meant to shrink a review to a short
+list, not replace looking at it. Validated so far against this project's own IAPP
+(credential.net) and Credly badges; a platform whose public profile page has a very different
+layout may need a different scraping approach for step 1, though the JSON shape and CLI stay
+the same.
+
 ## Architecture
 
 **At a glance** — solid arrows are always local; dashed arrows are the only points where data
@@ -665,13 +743,25 @@ flowchart TB
     end
     activities --> readycli
     recordcli --> ledger
+
+    subgraph profilesync["Optional — Public-profile badge sync (needs a live MCP session)"]
+        badgesjson["badges.json"]
+        claudeprofile["Claude session<br/>+ Claude-in-Chrome"]
+        wallets[("credential.net /<br/>Credly public profile")]
+        diffcli["profile_sync.py<br/>diff / apply"]
+
+        wallets -.->|"reads public badges —<br/>data leaves machine"| claudeprofile
+        claudeprofile --> badgesjson
+        badgesjson --> diffcli
+    end
+    diffcli -->|"human go/no-go<br/>per record"| db
 ```
 
 The core loop (top box) is a closed system: your browser, the Flask app, and one SQLite file.
-Neither optional feature is reachable from inside that loop — `calendar_ingest.py` and
-`portal_submit.py` are separate CLI entry points that a *human* runs, fed by a separate AI
-session the human also starts and supervises. There is no code path from `run.py` into Claude
-or any MCP connector.
+None of the three optional features are reachable from inside that loop — `calendar_ingest.py`,
+`portal_submit.py`, and `profile_sync.py` are separate CLI entry points that a *human* runs, fed
+by a separate AI session the human also starts and supervises. There is no code path from
+`run.py` into Claude or any MCP connector.
 
 Single-language Python stack, chosen for hackability over ceremony:
 
@@ -691,6 +781,8 @@ ce_tracker/
   routes.py           Flask routes (dashboard, CRUD, review, exports)
   reports.py          CSV/PDF generation
   calendar_ingest.py  event scoring + staging CLI (pure stdlib)
+  portal_submit.py    issuer-portal submission ledger + mapping-suggestion CLI
+  profile_sync.py     public-badge-profile diff/apply CLI (Credential.net, Credly)
   certificate_parse.py  local PDF text extraction + field heuristics for upload auto-fill
   transcript_parse.py  bulk multi-record transcript PDF extraction + staging
   docs_content.py     in-app docs text
