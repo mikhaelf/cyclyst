@@ -13,10 +13,8 @@ is done by a live Claude-in-Chrome session, which calls `list-ready` to find can
 `record-submission` to log the result.
 
 Category/domain/auto-reporting-provider notes below come from the first live run against the
-real ISC2 form (2026-05-11) — see CLAUDE.local.md for the full account. PMI mapping is built
-from the CCR Handbook (`Credential Providers/PMI/ccr-certification-requirements-handbook.pdf`)
-but hasn't had a live CCRS run yet — treat its suggestions as less trustworthy than ISC2's
-until one happens.
+real ISC2 form (2026-05-11) and the first live run against the real CCRS/PMI form (2026-05-13)
+— see CLAUDE.local.md for the full account of both.
 """
 
 import argparse
@@ -81,10 +79,18 @@ def suggest_isc2_mapping(activity):
     return {"category": category, "cpe_type": cpe_type, "domain": domain}
 
 
-# Suggests PMI's Education/Giving Back "Ways to Earn PDUs" category and a Talent Triangle leg,
-# from the CCR Handbook's real vocabulary (Credential Providers/PMI/ccr-certification-
-# requirements-handbook.pdf). Not yet validated against a live CCRS run — treat as a rougher
-# starting point than suggest_isc2_mapping until one happens.
+# Suggests PMI's Education/Giving Back "Ways to Earn PDUs" category and a Talent Triangle leg.
+# Validated against a live CCRS run on 2026-05-13 (3 real submissions) — cpe_type strings below
+# match the live form's exact wording, which differs slightly from the CCR Handbook's own text
+# ("Course or Training" singular and "Read", not the Handbook's "Courses or Training" and
+# "Reading Materials"). Two things this function deliberately does NOT encode, left as the live
+# session's job instead:
+# - Organization Meetings caps at PMI_ORG_MEETINGS_PDU_CAP PDUs on the live form (a real
+#   constraint not mentioned anywhere in the Handbook) — `list-ready` warns separately below
+#   rather than silently steering the suggestion away from it.
+# - Give a Presentation's Description field turned out to be required on the live form (unlike
+#   Course or Training's, which is optional) — a live-session form-filling detail, not a mapping
+#   concern, so it isn't reflected here.
 _PMI_COURSE_KEYWORDS = ("course", "training", "bootcamp", "class")
 _PMI_MEETING_KEYWORDS = ("summit", "conference", " con", "con -", "symposium", "forum", "meeting", "chapter")
 _PMI_DIGITAL_KEYWORDS = ("webinar", "podcast", "on-demand", "online", "briefing")
@@ -107,13 +113,13 @@ def suggest_pmi_mapping(activity):
 
     category = cpe_type = None
     if any(k in haystack for k in _PMI_COURSE_KEYWORDS):
-        category, cpe_type = "Education", "Courses or Training"
+        category, cpe_type = "Education", "Course or Training"
     elif any(k in haystack for k in _PMI_MEETING_KEYWORDS):
         category, cpe_type = "Education", "Organization Meetings"
     elif any(k in haystack for k in _PMI_DIGITAL_KEYWORDS):
         category, cpe_type = "Education", "Online or Digital Media"
     elif any(k in haystack for k in _PMI_READING_KEYWORDS):
-        category, cpe_type = "Education", "Reading Materials"
+        category, cpe_type = "Education", "Read"
     elif any(k in haystack for k in _PMI_INFORMAL_KEYWORDS):
         category, cpe_type = "Education", "Informal Learning"
     elif any(k in haystack for k in _PMI_VOLUNTEER_KEYWORDS):
@@ -142,6 +148,14 @@ def suggest_pmi_mapping(activity):
 
 
 MAPPING_SUGGESTERS = {"cissp": suggest_isc2_mapping, "pmp": suggest_pmi_mapping}
+
+# Organization Meetings caps at this many PDUs per meeting on PMI's live Report-PDU form ("Chapter,
+# company, or professional meetings limited to 2 PDUs") — confirmed 2026-05-13, not mentioned in
+# the CCR Handbook at all. suggest_pmi_mapping() doesn't route around this on its own (it has no
+# way to know a better fit exists without also second-guessing every other keyword match), so
+# `list-ready` checks it directly and flags activities that would exceed the cap under this
+# suggestion.
+PMI_ORG_MEETINGS_PDU_CAP = 2
 
 
 def is_auto_reporting_provider(activity, credential_id):
@@ -199,23 +213,51 @@ def record_submission(conn, activity_id, credential_id, source, confirmation_id=
     conn.commit()
 
 
-RECONCILE_WAIT_MINUTES = 60
+# How long to wait, in minutes, before a submitted claim is worth re-checking against the live
+# portal for confirmation. ISC2 gives one uniform "record will update within 60 minutes" window
+# regardless of category, but PMI/CCRS does not: the 2026-05-13 live run showed Education claims
+# (Course or Training) coming back Approved instantly, while Giving Back claims (Give a
+# Presentation, Work as a Practitioner) came back Submitted with "Processing of this claim can
+# take up to 5 business days." Keyed by (credential_id, submitted_category); the
+# (credential_id, None) entry is the fallback for a credential with no per-category distinction,
+# or a ledger row whose category wasn't recorded (e.g. an older 'portal-existing' row predating
+# the submitted_category column).
+RECONCILE_WAIT_MINUTES = {
+    ("cissp", None): 60,
+    ("pmp", "Education"): 5,
+    ("pmp", "Giving Back"): 5 * 24 * 60,
+}
+DEFAULT_RECONCILE_WAIT_MINUTES = 60
+
+
+def _reconcile_wait_minutes(credential_id, submitted_category):
+    return (
+        RECONCILE_WAIT_MINUTES.get((credential_id, submitted_category))
+        or RECONCILE_WAIT_MINUTES.get((credential_id, None))
+        or DEFAULT_RECONCILE_WAIT_MINUTES
+    )
 
 
 def pending_reconciliation(conn, credential_id="cissp"):
     """Ledger rows this automation submitted that are old enough for the issuer's own "record
-    will update within N minutes" window to have elapsed, and haven't been confirmed against a
-    live re-check of the portal yet. Only 'automation'-sourced rows apply — a 'portal-existing'
-    row was already confirmed at record time, and 'manual' rows aren't ours to reconcile. See
-    ce-cpe-tracker-design.md §7a "Confirmation semantics"."""
-    cutoff = (datetime.now() - timedelta(minutes=RECONCILE_WAIT_MINUTES)).isoformat()
-    return conn.execute(
+    will update within N minutes" window to have elapsed (a per-category wait — see
+    RECONCILE_WAIT_MINUTES), and haven't been confirmed against a live re-check of the portal
+    yet. Only 'automation'-sourced rows apply — a 'portal-existing' row was already confirmed at
+    record time, and 'manual' rows aren't ours to reconcile. See ce-cpe-tracker-design.md §7a
+    "Confirmation semantics"."""
+    rows = conn.execute(
         "SELECT aps.*, a.date, a.hours, a.provider, a.title FROM activity_portal_submissions aps "
         "JOIN activities a ON a.id = aps.activity_id "
         "WHERE aps.credential_id = ? AND aps.status = 'submitted' AND aps.source = 'automation' "
-        "AND aps.recorded_at <= ? ORDER BY aps.recorded_at",
-        (credential_id, cutoff),
+        "ORDER BY aps.recorded_at",
+        (credential_id,),
     ).fetchall()
+    now = datetime.now()
+    return [
+        r for r in rows
+        if now - datetime.fromisoformat(r["recorded_at"])
+        >= timedelta(minutes=_reconcile_wait_minutes(credential_id, r["submitted_category"]))
+    ]
 
 
 def confirm_submission(conn, activity_id, credential_id, portal_hours=None, portal_title=None):
@@ -259,7 +301,7 @@ def main():
     rec_p.add_argument("--domain", help="Portal domain/talent-triangle pick(s) actually checked, comma-separated if more than one.")
 
     pending_p = sub.add_parser("list-pending-reconcile",
-                                help="List automation submissions old enough (60+ min) to re-check against the live portal.")
+                                help="List automation submissions old enough (per RECONCILE_WAIT_MINUTES) to re-check against the live portal.")
     pending_p.add_argument("--credential", default="cissp", help=credential_help)
 
     confirm_p = sub.add_parser("confirm-submission",
@@ -286,6 +328,9 @@ def main():
                 if mapping["category"] or mapping["domain"]:
                     print(f"      suggested mapping (confirm before submitting): "
                           f"{mapping['category'] or '?'} > {mapping['cpe_type'] or '?'} | domain: {mapping['domain'] or '?'}")
+                if mapping["cpe_type"] == "Organization Meetings" and r["hours"] > PMI_ORG_MEETINGS_PDU_CAP:
+                    print(f"      Organization Meetings caps at {PMI_ORG_MEETINGS_PDU_CAP} PDUs/meeting on the live form — "
+                          f"{r['hours']:g}h exceeds it; pick a different category on the live form (e.g. Course or Training)")
             if args.credential == "cissp":
                 rounded = isc2_credits(r["hours"])
                 if rounded != r["hours"]:
