@@ -5,6 +5,9 @@ THREAT-MODEL.md
 PUBLISHING-CHECKLIST.md
 ce-cpe-tracker-design.md
 
+# UI prototype handoff — kept locally for reference, not part of the open-source repo
+design/ui-handoff/
+
 # Python
 .venv/
 __pycache__/
