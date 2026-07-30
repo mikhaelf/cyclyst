@@ -147,6 +147,13 @@ class PortalSubmitTests(unittest.TestCase):
         self.assertEqual(mapping["cpe_type"], "Online or Digital Media")
         self.assertEqual(mapping["domain"], "Business Acumen")
 
+    def test_suggest_pmi_mapping_practitioner_title_has_no_domain(self):
+        activity = {"title": "Program Manager, Cloud Security – work as a practitioner", "category": "Work as a Practitioner"}
+        mapping = suggest_pmi_mapping(activity)
+        self.assertEqual(mapping["category"], "Giving Back")
+        self.assertEqual(mapping["cpe_type"], "Work as a Practitioner")
+        self.assertIsNone(mapping["domain"])
+
     def test_suggest_pmi_mapping_unmatched_returns_none(self):
         activity = {"title": "Some Unlabeled Activity", "category": None}
         mapping = suggest_pmi_mapping(activity)

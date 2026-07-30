@@ -92,6 +92,7 @@ _PMI_READING_KEYWORDS = ("book", "article", "whitepaper", "white paper", "blog",
 _PMI_INFORMAL_KEYWORDS = ("mentoring", "mentor", "panel", "lunch and learn", "lunch-and-learn")
 _PMI_VOLUNTEER_KEYWORDS = ("volunteer",)
 _PMI_PRESENTATION_KEYWORDS = ("presentation", "speaking", "speaker", "present")
+_PMI_PRACTITIONER_KEYWORDS = ("practitioner",)
 
 
 def suggest_pmi_mapping(activity):
@@ -119,16 +120,23 @@ def suggest_pmi_mapping(activity):
         category, cpe_type = "Giving Back", "Volunteer"
     elif any(k in haystack for k in _PMI_PRESENTATION_KEYWORDS):
         category, cpe_type = "Giving Back", "Give a Presentation"
+    elif any(k in haystack for k in _PMI_PRACTITIONER_KEYWORDS):
+        category, cpe_type = "Giving Back", "Work as a Practitioner"
 
+    # Talent Triangle domain fields only apply to Education claims — confirmed for Giving Back
+    # generally on the live CCRS form (2026-05-13 session, Give a Presentation had no domain
+    # selector). Work as a Practitioner is also Giving Back, so skip the domain guess for it too
+    # rather than suggest a field the live form likely won't even show.
     domain = None
-    for keywords, candidate in (
-        (("leadership", "communication", "stakeholder", "collaborat", "empathy"), "Power Skills"),
-        (("strategy", "business", "portfolio", "roadmap", "governance", "executive"), "Business Acumen"),
-        (("agile", "scrum", "framework", "methodology", "technique", "waterfall"), "Ways of Working"),
-    ):
-        if any(k in haystack for k in keywords):
-            domain = candidate
-            break
+    if cpe_type != "Work as a Practitioner":
+        for keywords, candidate in (
+            (("leadership", "communication", "stakeholder", "collaborat", "empathy"), "Power Skills"),
+            (("strategy", "business", "portfolio", "roadmap", "governance", "executive"), "Business Acumen"),
+            (("agile", "scrum", "framework", "methodology", "technique", "waterfall"), "Ways of Working"),
+        ):
+            if any(k in haystack for k in keywords):
+                domain = candidate
+                break
 
     return {"category": category, "cpe_type": cpe_type, "domain": domain}
 
