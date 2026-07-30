@@ -84,9 +84,10 @@ per-credential progress, pace status, and audit-ready reports.
   from your cycle dates and logged hours, never stored as stale numbers.
 - **Real renewal semantics:** calendar-year vs. anniversary reporting windows, suggested vs.
   mandatory annual minimums, per-issuer grace periods, min/max category rules with
-  arbitrary nesting, exam-only credentials (no CE, just an expiration to watch), and
-  dependency cascades ("this credential lapses if that one does" — including *any-of*
-  groups).
+  arbitrary nesting, exam-only credentials (no CE, just an expiration to watch), carryover of
+  hours/PDUs earned in the final stretch of a prior cycle into the next one (capped and
+  window-limited per issuer — e.g. PMI's 20-PDU/12-month rule for PMP), and dependency
+  cascades ("this credential lapses if that one does" — including *any-of* groups).
 - **One activity, many credentials:** each logged activity applies to any set of
   hour-based credentials; category rollups update everywhere at once.
 - **Certificate upload auto-fill:** attach a certificate of completion (PDF) on the Add
@@ -207,12 +208,15 @@ throwaway file keeps it out of your real data.
 Everything is stored in `data/tracker.db` (SQLite), which is gitignored — it never enters
 version control. Backups are just a copy of that one file.
 
-> **Member ID field:** the optional Member ID on a credential stores a real issuer-account
-> number (e.g. an ISC2 or ISACA member ID) in plaintext, same as the rest of the database.
-> It appears on the dashboard (masked by default — click it to reveal) and, unmasked, in the
-> title of exported PDF reports (it is not included in CSV exports). Review a PDF before
-> sharing it, and avoid pasting real member IDs into seed data, screenshots, or bug reports —
-> this project has previously had to scrub a leaked member ID from its own git history.
+> **Member ID / certification number fields:** the optional Member ID and Certification Number
+> on a credential both store real issuer-account numbers (e.g. an ISC2 or ISACA member ID, or
+> PMI's own "Certification Number") in plaintext, same as the rest of the database. They're
+> treated differently on screen, though: Member ID is masked by default on the dashboard (click
+> it to reveal), while **Certification Number is always shown unmasked** — it appears next to
+> the credential name whenever it's set. Both appear unmasked in the title of exported PDF
+> reports (neither is included in CSV exports). Review a PDF before sharing it, and avoid
+> pasting real member/certification IDs into seed data, screenshots, or bug reports — this
+> project has previously had to scrub a leaked member ID from its own git history.
 
 | Environment variable | Default | Purpose |
 |---|---|---|
@@ -336,10 +340,12 @@ author email until you rewrite history (usually unnecessary once the first push 
 ## Using the tracker
 
 1. **Add each credential** with its real rules. The form covers the whole schema: renewal
-   type (`cpe_hours` / `exam` / `mandatory_module`), cycle start/end, reporting calendar
-   (calendar-year or anniversary), hour total and unit, annual minimum (suggested or
-   mandatory), grace period days, category min/max rules (nestable), dependencies, and
-   "confirmed elsewhere" adjustment hours.
+   type (`cpe_hours` / `exam` / `mandatory_module`), an optional member ID / certification
+   number / original grant date, cycle start/end, reporting calendar (calendar-year or
+   anniversary), hour total and unit, annual minimum (suggested or mandatory), grace period
+   days, category min/max rules (nestable), carryover cap and window (if the issuer allows
+   carrying unused hours into the next cycle), dependencies, and "confirmed elsewhere"
+   adjustment hours.
 2. **Log activities** as you complete them — date, provider, title, hours, category, and
    *every* credential they apply to. Only hour-based (`cpe_hours`) credentials are offered
    as targets; exam-only credentials never accumulate hours. Optionally attach a certificate
@@ -603,16 +609,20 @@ auto-reported entries on the first real ISC2 run — `--portal-hours` / `--porta
 the local activity to match: the portal's accepted figure is the source of truth once
 something is actually live there, not what was originally logged.
 
-**Scope, honestly:** ISC2/CISSP is the only mapping validated against a real live run so far
-(see `CLAUDE.local.md` for that account); PMI/PMP mapping (`suggest_pmi_mapping`) is built
-from PMI's CCR Handbook but hasn't had a first supervised run against `ccrs.pmi.org` yet, so
-treat its suggestions as a rougher starting point until that happens. See
-`ce-cpe-tracker-design.md` §7a/§7b for the duplicate-prevention design and confirmation
-semantics per issuer. Category/domain suggestions are always heuristic and always reviewed by
-a human on the live form, and there is deliberately no way to run any of this without a live,
-supervised browser session on the other end. Adding a third issuer means adding its own
-mapping function and wiring it into `MAPPING_SUGGESTERS` — the ledger, CLI, and dashboard
-section need no changes.
+**Scope, honestly:** both mapped issuers have now had a first live run validate their
+suggester — ISC2/CISSP on 2026-05-11, PMI/PMP on 2026-05-13 (see `CLAUDE.local.md` for both
+accounts) — so `suggest_isc2_mapping`/`suggest_pmi_mapping`'s wording matches what each live
+form actually shows, not just handbook text. One cross-issuer difference worth knowing:
+confirmation timing isn't uniform. ISC2 gives one ~60-minute "record will update" window for
+everything; PMI's CCRS instead approves Education claims (Course or Training, Read, etc.)
+almost instantly but queues Giving Back claims (Give a Presentation, Work as a Practitioner)
+for up to 5 business days of manual review — `list-pending-reconcile` already accounts for
+this per-category difference for PMP. See `ce-cpe-tracker-design.md` §7a/§7b for the full
+duplicate-prevention design and confirmation semantics per issuer. Category/domain
+suggestions are always heuristic and always reviewed by a human on the live form, and there
+is deliberately no way to run any of this without a live, supervised browser session on the
+other end. Adding a third issuer means adding its own mapping function and wiring it into
+`MAPPING_SUGGESTERS` — the ledger, CLI, and dashboard section need no changes.
 
 Every flag on every subcommand above has its own `--help` text (`python -m ce_tracker.portal_submit
 <subcommand> --help`) — that's the full reference; the walkthrough above only covers the ones
@@ -842,8 +852,6 @@ file.**
   dependency — deferred until local PDF-text parsing proves useful enough to justify it)
 - Opt-in LLM-based fallback for certificate parsing when local heuristics miss — would be
   the project's first outbound network call, so off by default and disclosed clearly
-- A first human-supervised run of PMI/PMP portal submission against the real `ccrs.pmi.org`
-  form, to validate `suggest_pmi_mapping()` the way ISC2's mapping was validated live
 - Extend portal submission automation to further issuers (e.g. IAPP) once a third one's
   portal shape has been mapped
 
