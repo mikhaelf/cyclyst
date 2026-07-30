@@ -179,10 +179,6 @@ pip install -r requirements.txt
 python run.py
 ```
 
-> **Private repo:** if you clone over HTTPS, authenticate with `gh auth login` or a
-> personal access token with `repo` scope. Collaborators must be added on GitHub before
-> they can clone.
-
 Open http://127.0.0.1:5000. A fresh install starts **empty** — click **+ Add Credential**
 and enter your first credential's rules (cycle dates, renewal type, hour total, category
 rules, grace period). Then log activities against it and the dashboard takes care of the
@@ -273,7 +269,6 @@ permissions differ; rebuild the venv instead.
 Safest for UI or feature testing — no real cert numbers or activity history.
 
 ```bash
-gh auth login   # or use HTTPS + a personal access token
 git clone https://github.com/mikhaelf/cyclyst.git
 cd cyclyst
 python3 -m venv .venv
