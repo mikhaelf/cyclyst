@@ -260,7 +260,26 @@ html, body {
 .submission-queue-hours { color: #667085; min-width: 40px; }
 
 /* Activity tab: add-activity form */
-.activity-toolbar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+.activity-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 14px; margin-bottom: 14px; }
+.activity-toggle-archived {
+  margin-right: auto; cursor: pointer;
+  font: 600 12px -apple-system, sans-serif; color: #667085; text-decoration: underline;
+}
+
+.activity-archive-form {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+}
+.activity-archive-form label {
+  display: flex; align-items: center; gap: 8px;
+  font: 600 12px -apple-system, sans-serif; color: #344054;
+}
+.activity-archive-form input[type="number"] {
+  width: 4.5em;
+  font: 13px -apple-system, sans-serif; color: #161a23;
+  border: 1px solid #eaecf0; border-radius: 6px; padding: 7px 10px;
+  background: #fff;
+}
+.form-note-inline { font: 11.5px -apple-system, sans-serif; color: #98a2b3; }
 
 .add-activity-form {
   background: #f7f8fa; border: 1px solid #eaecf0; border-radius: 9px;
@@ -306,6 +325,11 @@ html, body {
   gap: 16px;
 }
 .activity-row > div:first-child { flex: 1; min-width: 0; }
+.activity-row--archived { opacity: .55; }
+.activity-archived-badge {
+  font: 700 10px -apple-system, sans-serif; color: #98a2b3;
+  border: 1px solid #eaecf0; border-radius: 4px; padding: 1px 5px; vertical-align: middle;
+}
 .activity-clickable { cursor: pointer; border-radius: 6px; margin: -4px -6px; padding: 4px 6px; }
 .activity-clickable:hover { background: #f7f8fa; }
 .activity-clickable:hover .activity-title { color: #2a6fd6; }

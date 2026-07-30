@@ -54,6 +54,7 @@ def _activity_view(row):
         "applies": row["applies"].split(",") if row["applies"] else [],
         "status_color": ACT_STATUS_COLOR[row["status"]],
         "status_label": ACT_STATUS_LABEL[row["status"]],
+        "archived": bool(row["archived"]),
     }
 
 
@@ -160,8 +161,11 @@ def _status_by_id(conn):
     return statuses
 
 
-def credential_view(row, conn):
+def credential_view(row, conn, show_archived=False):
     categories = _fetch_categories(conn, row["id"])
+    # Unfiltered -- progress totals, category rollups, and the submission queue must keep
+    # counting archived activities exactly like non-archived ones (see retention.py). Only the
+    # displayed "activities" list below filters on show_archived.
     activities = _fetch_applicable_activities(conn, row["id"])
     prog = progress.compute_progress(row, activities, categories)
 
@@ -192,7 +196,9 @@ def credential_view(row, conn):
         "status_label": STATUS_LABEL[status],
         "ring_gradient": f"conic-gradient({status_color} {(pct or 0) * 3.6}deg, #eaecf0 0deg)",
         "categories": [_category_view(c) for c in prog["category_results"]],
-        "activities": [_activity_view(a) for a in activities],
+        "activities": [
+            _activity_view(a) for a in activities if show_archived or not a["archived"]
+        ],
         "badge_platform": row["badge_platform"],
         "badge_visibility": row["badge_visibility"],
         "badge_url": row["badge_url"],
@@ -295,6 +301,6 @@ def pending_view(conn):
     return result
 
 
-def get_credential_or_404(conn, credential_id):
+def get_credential_or_404(conn, credential_id, show_archived=False):
     row = conn.execute("SELECT * FROM credentials WHERE id = ? AND archived = 0", (credential_id,)).fetchone()
-    return credential_view(row, conn) if row else None
+    return credential_view(row, conn, show_archived=show_archived) if row else None

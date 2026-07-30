@@ -109,7 +109,10 @@ CREATE TABLE IF NOT EXISTS activities (
     hours REAL NOT NULL,
     category TEXT,
     applies TEXT NOT NULL, -- comma-separated credential ids
-    status TEXT NOT NULL   -- 'submitted' or 'logged'
+    status TEXT NOT NULL,  -- 'submitted' or 'logged'
+    archived INTEGER NOT NULL DEFAULT 0 -- hidden from the default Activity Log view (see
+    -- ce_tracker/retention.py); still counted by progress.py, dedup, and reports -- never a
+    -- second system of record, just a decluttered list
 );
 
 CREATE TABLE IF NOT EXISTS pending_activities (
@@ -378,6 +381,15 @@ def _migrate_portal_submission_columns(conn):
             conn.execute(f"ALTER TABLE activity_portal_submissions ADD COLUMN {new_name} TEXT")
 
 
+def _migrate_activity_archived_column(conn):
+    """Adds the archived flag used by ce_tracker/retention.py (never a destructive delete —
+    see that module's docstring)."""
+    existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(activities)")}
+    if "archived" in existing_cols:
+        return
+    conn.execute("ALTER TABLE activities ADD COLUMN archived INTEGER NOT NULL DEFAULT 0")
+
+
 def init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = get_db()
@@ -392,6 +404,7 @@ def init_db():
     _migrate_pending_activity_columns(conn)
     _migrate_pending_activity_breakdown_column(conn)
     _migrate_portal_submission_columns(conn)
+    _migrate_activity_archived_column(conn)
     conn.commit()
     conn.close()
 

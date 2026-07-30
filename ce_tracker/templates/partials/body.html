@@ -378,12 +378,29 @@
 
       {% elif tab == 'activity' %}
         <div class="activity-toolbar">
+          <a class="activity-toggle-archived"
+             hx-get="{{ url_for('main.view_fragment', selected=credential.id, tab='activity', show_archived=('0' if show_archived else '1')) }}"
+             hx-target="#app-body" hx-swap="innerHTML" hx-push-url="true">
+            {{ 'Hide archived' if show_archived else 'Show archived' }}
+          </a>
           {% if not show_add_form %}
           <button class="btn-secondary"
                   hx-get="{{ url_for('main.new_activity_form', selected=credential.id) }}"
                   hx-target="#app-body" hx-swap="innerHTML">+ Add Activity</button>
           {% endif %}
         </div>
+
+        <form class="activity-archive-form"
+              hx-post="{{ url_for('main.archive_activities', selected=credential.id) }}"
+              hx-target="#app-body" hx-swap="innerHTML"
+              hx-confirm="This archives every activity dated before the cutoff, across your whole log (not just this credential). A CSV backup is saved to data/archives/ first, and any entry can be unarchived individually. Continue?">
+          <label>Archive activities older than
+            <input type="number" name="years" min="1" step="1" placeholder="e.g. 7" required>
+          </label>
+          <span class="form-note-inline">years — applies to your whole activity log</span>
+          <button type="submit" class="btn-secondary">Archive</button>
+        </form>
+        {% if archive_note %}<div class="form-note">{{ archive_note }}</div>{% endif %}
 
         {% if show_add_form %}
         {% if not edit_activity_id and not review_pending_id %}
@@ -457,19 +474,24 @@
 
         {% if credential.activities %}
           {% for a in credential.activities %}
-          <div class="activity-row">
+          <div class="activity-row {{ 'activity-row--archived' if a.archived else '' }}">
             <div class="activity-clickable"
                  hx-get="{{ url_for('main.edit_activity_form', activity_id=a.id, selected=credential.id) }}"
                  hx-target="#app-body" hx-swap="innerHTML">
-              <div class="activity-title">{{ a.title }}</div>
+              <div class="activity-title">{{ a.title }}{% if a.archived %} <span class="activity-archived-badge">Archived</span>{% endif %}</div>
               <div class="activity-meta">{{ a.provider }} · {{ a.date }} · {{ a.category }}</div>
             </div>
             <div class="activity-right">
               <div class="activity-hours">{{ a.hours_label }}</div>
               <div class="activity-status" style="color:{{ a.status_color }}">{{ a.status_label }}</div>
             </div>
+            {% if a.archived %}
+            <button class="btn-secondary small"
+                    hx-post="{{ url_for('main.unarchive_activity', activity_id=a.id, selected=credential.id) }}"
+                    hx-target="#app-body" hx-swap="innerHTML">Unarchive</button>
+            {% endif %}
             <button class="activity-delete-btn"
-                    hx-delete="{{ url_for('main.delete_activity', activity_id=a.id, selected=credential.id, tab='activity') }}"
+                    hx-delete="{{ url_for('main.delete_activity', activity_id=a.id, selected=credential.id, tab='activity', show_archived=('1' if show_archived else '0')) }}"
                     hx-target="#app-body" hx-swap="innerHTML"
                     hx-confirm="Delete this activity? This can't be undone.">×</button>
           </div>

@@ -5,14 +5,14 @@ from datetime import date
 
 from flask import Blueprint, Response, current_app, render_template, request
 
-from . import agenda_parse, certificate_parse, progress, reports, transcript_parse, views
+from . import agenda_parse, certificate_parse, progress, reports, retention, transcript_parse, views
 from .db import get_db
 from .docs_content import DOCS_SECTIONS
 
 bp = Blueprint("main", __name__)
 
 
-def _body_context(selected_id, tab):
+def _body_context(selected_id, tab, show_archived=False):
     conn = get_db()
     sidebar = views.sidebar_credentials(conn)
     if not selected_id and sidebar:
@@ -20,7 +20,10 @@ def _body_context(selected_id, tab):
     context = {
         "sidebar": sidebar,
         "archived": views.archived_credentials(conn),
-        "credential": views.get_credential_or_404(conn, selected_id) if selected_id else None,
+        "credential": (
+            views.get_credential_or_404(conn, selected_id, show_archived=show_archived)
+            if selected_id else None
+        ),
         "pending": views.pending_view(conn),
         "tab": tab,
         "all_credentials": [
@@ -51,6 +54,8 @@ def _body_context(selected_id, tab):
         "badge_form_values": {},
         "badge_form_errors": {},
         "status_legend": views.STATUS_LEGEND,
+        "show_archived": show_archived,
+        "archive_note": None,
         "show_archive_form": False,
         "credential_form_view": False,
         "credential_form_mode": None,
@@ -322,14 +327,16 @@ def _parse_credential_form(form):
 def index():
     selected_id = request.args.get("selected")
     tab = request.args.get("tab", "overview")
-    return render_template("index.html", **_body_context(selected_id, tab))
+    show_archived = request.args.get("show_archived") == "1"
+    return render_template("index.html", **_body_context(selected_id, tab, show_archived=show_archived))
 
 
 @bp.route("/view")
 def view_fragment():
     selected_id = request.args.get("selected")
     tab = request.args.get("tab", "overview")
-    return render_template("partials/body.html", **_body_context(selected_id, tab))
+    show_archived = request.args.get("show_archived") == "1"
+    return render_template("partials/body.html", **_body_context(selected_id, tab, show_archived=show_archived))
 
 
 @bp.route("/docs")
@@ -597,13 +604,62 @@ def update_activity(activity_id):
 def delete_activity(activity_id):
     selected_id = request.args.get("selected")
     tab = request.args.get("tab", "activity")
+    show_archived = request.args.get("show_archived") == "1"
 
     conn = get_db()
     conn.execute("DELETE FROM activities WHERE id = ?", (activity_id,))
     conn.commit()
     conn.close()
 
-    return render_template("partials/body.html", **_body_context(selected_id, tab))
+    return render_template("partials/body.html", **_body_context(selected_id, tab, show_archived=show_archived))
+
+
+@bp.route("/activities/archive", methods=["POST"])
+def archive_activities():
+    """Bulk retention action (ce_tracker/retention.py): archives -- never deletes -- every
+    activity dated before a chosen number of years ago, across the whole log (not scoped to
+    whichever credential happens to be selected, since one activity can apply to several).
+    A CSV backup of exactly what's archived is always written first."""
+    selected_id = request.args.get("selected")
+    years_raw = (request.form.get("years") or "").strip()
+
+    note = None
+    years = None
+    try:
+        years = int(years_raw)
+        if years < 1:
+            raise ValueError
+    except ValueError:
+        note = "Enter a whole number of years (1 or more)."
+
+    if years is not None:
+        conn = get_db()
+        cutoff_iso, backup_path, count = retention.archive_activities(conn, years)
+        conn.close()
+        if count == 0:
+            note = f"No activities dated before {cutoff_iso} to archive."
+        else:
+            note = (
+                f"Archived {count} activit{'y' if count == 1 else 'ies'} dated before "
+                f"{cutoff_iso} — backup saved to data/archives/{backup_path.name}. Progress "
+                "totals and reports are unaffected; archived activities are just hidden from "
+                "this list. Unarchive any entry below to bring it back."
+            )
+
+    context = _body_context(selected_id, "activity", show_archived=True)
+    context["archive_note"] = note
+    return render_template("partials/body.html", **context)
+
+
+@bp.route("/activities/<int:activity_id>/unarchive", methods=["POST"])
+def unarchive_activity(activity_id):
+    selected_id = request.args.get("selected")
+
+    conn = get_db()
+    retention.unarchive_activity(conn, activity_id)
+    conn.close()
+
+    return render_template("partials/body.html", **_body_context(selected_id, "activity", show_archived=True))
 
 
 @bp.route("/credentials/new")

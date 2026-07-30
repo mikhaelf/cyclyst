@@ -110,6 +110,26 @@ DOCS_SECTIONS = [
         """,
     },
     {
+        "id": "archive-old-activities",
+        "title": "Archive old activities",
+        "body": """
+            <p class="docs-copy">The <strong>Activity Log</strong> tab has an
+            <strong>Archive activities older than [N] years</strong> control to declutter a
+            long history — it's an explicit action you trigger, never automatic.</p>
+            <ul class="docs-steps">
+                <li>A CSV backup of everything about to be archived is written to
+                <code>data/archives/</code> before anything is hidden.</li>
+                <li>Archiving only hides an activity from the default list — it's never
+                deleted, and progress totals, reports, and duplicate detection still count it
+                normally.</li>
+                <li>Click <strong>Show archived</strong> to see archived entries and
+                <strong>Unarchive</strong> any of them individually — fully reversible.</li>
+                <li>The cutoff applies to your whole activity log, not just the credential
+                you currently have selected.</li>
+            </ul>
+        """,
+    },
+    {
         "id": "good-to-know",
         "title": "Good to know",
         "body": """

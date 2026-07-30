@@ -109,6 +109,10 @@ per-credential progress, pace status, and audit-ready reports.
   below.
 - **Reports:** itemized CSV and audit-ready PDF exports scoped to a credential's current
   cycle window.
+- **Activity Log retention (opt-in, never automatic):** archive activities older than a
+  chosen number of years to declutter the Activity Log — a CSV backup is written first, and
+  archiving never deletes anything or affects progress totals, reports, or duplicate
+  detection. See [Activity Log retention](#activity-log-retention-optional) below.
 - **Quality-of-life:** public badge links (Credly / Credential.net), archived credentials,
   in-app docs, in-place editing of everything — no hand-editing the database.
 - **ISC2 portal submission automation (CISSP):** a submission-tracking ledger plus a
@@ -429,6 +433,29 @@ candidate in Pending Review.
   next session's start time). If the agenda's dates don't include a year, enter one in the
   optional **Year** field before importing. A third layout isn't guaranteed to parse — check
   what actually got staged before approving it.
+
+## Activity Log retention (optional)
+
+The Activity Log tab has an **Archive activities older than [N] years** control. It's a
+deliberate, explicit action — nothing is ever archived automatically, and there is no
+startup or scheduled purge.
+
+- **Archives, never deletes.** Archiving only sets a flag that hides an activity from the
+  default Activity Log view. The underlying row stays in `data/tracker.db`: progress
+  totals, category rollups, CSV/PDF report exports, and duplicate detection on future
+  imports all keep counting archived activities exactly like non-archived ones. Archiving
+  is decluttering, not retention in the "delete old data" sense.
+- **A CSV backup is always written first**, to `data/archives/activities-archived-<timestamp>.csv`
+  (gitignored, alongside `data/tracker.db`) — a durable, human-readable copy of exactly what
+  got archived, independent of the database itself.
+- **Fully reversible.** Toggle **Show archived** on the Activity Log tab to see archived
+  entries (dimmed, with an "Archived" badge) and unarchive any of them individually.
+- **Applies to your whole log, not just the credential you have selected**, since one
+  activity can apply to several credentials at once — the cutoff is a single date computed
+  from "N years before today," applied across every credential's activities.
+- There's deliberately no per-issuer-audit-window guidance baked in — issuers' own
+  record-retention expectations vary and aren't tracked anywhere in this codebase, so picking
+  a safe number of years is on you.
 
 ## ISC2 portal submission automation (CISSP, optional, MCP-assisted)
 
