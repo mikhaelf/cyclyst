@@ -132,6 +132,11 @@ DOCS_SECTIONS = [
                 <li><strong>Personal use, one principal.</strong> Built for one person tracking
                 their own credentials on their own machine — not for tracking or submitting CE
                 on someone else's behalf.</li>
+                <li><strong>Member ID is sensitive.</strong> The optional Member ID field
+                stores a real issuer-account number in plaintext. It's masked on the dashboard
+                by default (click to reveal) but appears unmasked in exported PDF report
+                titles — review a PDF before sharing it. It's never included in CSV
+                exports.</li>
                 <li><strong>Unofficial and unaffiliated.</strong> Not authorized, sponsored, or
                 officially supported by ISC2, ISACA, PMI, IAPP, or any other issuer or vendor it
                 references. Portal forms and rules can change without notice. Use at your own

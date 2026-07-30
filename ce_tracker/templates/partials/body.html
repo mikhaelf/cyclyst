@@ -258,7 +258,7 @@
     {% elif credential %}
     <div class="detail-header">
       <div>
-        <div class="detail-name">{{ credential.name }}{% if credential.member_id %} <span class="detail-member-id">· {{ credential.member_id }}</span>{% endif %}</div>
+        <div class="detail-name">{{ credential.name }}{% if credential.member_id %} <span class="detail-member-id">· <span class="member-id-value" data-full="{{ credential.member_id }}" data-masked="{{ credential.member_id_masked }}" title="Click to reveal/hide" onclick="this.textContent = (this.textContent === this.dataset.masked ? this.dataset.full : this.dataset.masked)">{{ credential.member_id_masked }}</span></span>{% endif %}</div>
         <div class="detail-sub">{{ credential.issuer }} · {{ credential.cycle_label }}</div>
       </div>
       <div class="detail-status">

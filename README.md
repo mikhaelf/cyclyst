@@ -198,6 +198,13 @@ throwaway file keeps it out of your real data.
 Everything is stored in `data/tracker.db` (SQLite), which is gitignored — it never enters
 version control. Backups are just a copy of that one file.
 
+> **Member ID field:** the optional Member ID on a credential stores a real issuer-account
+> number (e.g. an ISC2 or ISACA member ID) in plaintext, same as the rest of the database.
+> It appears on the dashboard (masked by default — click it to reveal) and, unmasked, in the
+> title of exported PDF reports (it is not included in CSV exports). Review a PDF before
+> sharing it, and avoid pasting real member IDs into seed data, screenshots, or bug reports —
+> this project has previously had to scrub a leaked member ID from its own git history.
+
 | Environment variable | Default | Purpose |
 |---|---|---|
 | `CE_TRACKER_DB` | `data/tracker.db` (under the repo root) | Path to the SQLite file. Use this to keep test and production data separate, or to store the DB outside the repo directory. |

@@ -135,6 +135,7 @@ html, body {
 .detail-header { padding: 22px 26px 0; display: flex; align-items: baseline; justify-content: space-between; }
 .detail-name { font: 700 21px -apple-system, sans-serif; color: #161a23; }
 .detail-member-id { font: 600 14px -apple-system, sans-serif; color: #98a2b3; }
+.member-id-value { cursor: pointer; }
 .detail-sub { font: 13px -apple-system, sans-serif; color: #667085; margin-top: 3px; }
 .detail-status { text-align: right; }
 .status-label { font: 700 13px -apple-system, sans-serif; }

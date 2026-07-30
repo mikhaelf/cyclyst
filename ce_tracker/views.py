@@ -81,6 +81,17 @@ def _annual_label(row, annual_earned):
     return None
 
 
+def _mask_member_id(value):
+    """Member ID is a real issuer-account identifier (see README/DISCLAIMER) — mask all but
+    the last 4 characters for the default on-screen display; the dashboard reveals the full
+    value on click, and exports/the edit form still use the unmasked value from the row."""
+    if not value:
+        return value
+    if len(value) <= 4:
+        return "•" * len(value)
+    return "•" * (len(value) - 4) + value[-4:]
+
+
 def _cycle_label(row):
     """cycle_label was a hand-typed display column from the original static seed data — once a
     credential's real cycle_start_date/cycle_end_date are known (cpe_hours type), derive the
@@ -166,6 +177,7 @@ def credential_view(row, conn):
         "name": row["name"],
         "issuer": row["issuer"],
         "member_id": row["member_id"],
+        "member_id_masked": _mask_member_id(row["member_id"]),
         "cycle_label": _cycle_label(row),
         "days_left": prog["days_left"],
         "days_label": _days_label(status, prog["days_left"], prog["grace_days_left"]),
