@@ -617,8 +617,7 @@ confirmation timing isn't uniform. ISC2 gives one ~60-minute "record will update
 everything; PMI's CCRS instead approves Education claims (Course or Training, Read, etc.)
 almost instantly but queues Giving Back claims (Give a Presentation, Work as a Practitioner)
 for up to 5 business days of manual review — `list-pending-reconcile` already accounts for
-this per-category difference for PMP. See `ce-cpe-tracker-design.md` §7a/§7b for the full
-duplicate-prevention design and confirmation semantics per issuer. Category/domain
+this per-category difference for PMP. Category/domain
 suggestions are always heuristic and always reviewed by a human on the live form, and there
 is deliberately no way to run any of this without a live, supervised browser session on the
 other end. Adding a third issuer means adding its own mapping function and wiring it into
@@ -807,9 +806,7 @@ never drift out of sync with the log. The date math — leap-year anniversaries,
 calendar-year vs. anniversary annual windows, grace periods, dependency cascades — is pure
 functions over plain dicts, which is what makes it testable.
 
-Design history lives in [`ce-cpe-tracker-design.md`](ce-cpe-tracker-design.md) (data model
-and business rules) and [`design/ui-handoff/`](design/ui-handoff/) (the original UI
-prototype).
+Design history for the original UI prototype lives in [`design/ui-handoff/`](design/ui-handoff/).
 
 ## Testing
 
@@ -829,12 +826,12 @@ file.**
   yet — it'll be added when a tracked credential actually needs it.
 - Certificate upload auto-fill only reads text-layer PDFs — scanned/photographed
   certificates (image-only PDFs) aren't handled yet, and fields it isn't confident about are
-  left blank rather than guessed. See `ce-cpe-tracker-design.md` §11 for the heuristic and a
-  possible future LLM-based fallback (opt-in, not built).
+  left blank rather than guessed. A possible future LLM-based fallback is opt-in and not
+  built yet.
 - **Transcript PDF import is only tested against ISC2's export.** The row-extraction rules
   (table layout, date format, how a shared multi-credential pool is represented) were built
   and validated against one real issuer's transcript. Other issuers' exports aren't
-  guaranteed to parse correctly, or at all — see `ce-cpe-tracker-design.md` §11a.
+  guaranteed to parse correctly, or at all.
 - Single-user by design. No auth, no multi-tenancy — run it on your own machine.
 - The Flask dev server is fine for localhost use; put a real WSGI server (e.g. gunicorn)
   in front of it if you expose it beyond loopback. By default `run.py` binds to `127.0.0.1`
