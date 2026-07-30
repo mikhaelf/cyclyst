@@ -68,8 +68,8 @@ class ProfileSyncTests(unittest.TestCase):
         self.assertFalse(finding["name_mismatch"])
 
     def test_exact_url_match_but_unrelated_name_flags_name_mismatch(self):
-        # Real bug this catches: a row's badge_url can be an exact, valid link to a *different*
-        # real badge than what the row's own name claims (the "gcp" row's link opened a Google
+        # Bug this catches: a row's badge_url can be an exact, valid link to a *different*
+        # badge than what the row's own name claims (the "gcp" row's link opened a Google
         # Cloud "Platform Leader" badge while the row itself was named/dated for
         # "Cloud GenAI Leader") -- exact URL agreement alone shouldn't hide that.
         self._insert_credential("gcp", "GCP Cloud GenAI Leader", "Google Cloud",
@@ -81,7 +81,7 @@ class ProfileSyncTests(unittest.TestCase):
         self.assertTrue(finding["name_mismatch"])
 
     def test_wrong_link_when_matched_row_has_a_different_url(self):
-        # Mirrors the real CISSP/PMP bug: cissp's stored badge_url was actually PMP's badge.
+        # Mirrors a real-shaped CISSP/PMP bug: cissp's stored badge_url was actually PMP's badge.
         self._insert_credential("cissp", "CISSP", "ISC2", "Credly", "https://www.credly.com/badges/pmp-uuid")
         badge = _badge("Certified Information Systems Security Professional (CISSP)", "ISC2",
                         "https://www.credly.com/badges/cissp-uuid")
@@ -126,7 +126,7 @@ class ProfileSyncTests(unittest.TestCase):
     # -- diff_badges: two scraped badges from the same issuer resolve independently --------
 
     def test_two_same_issuer_badges_each_claim_the_right_row(self):
-        # Real shape: GCP row exists for "Cloud GenAI Leader" only; a second Google Cloud
+        # Shape this covers: GCP row exists for "Cloud GenAI Leader" only; a second Google Cloud
         # badge ("Platform Leader") should NOT get matched to the same row.
         self._insert_credential("gcp", "GCP Cloud GenAI Leader", "Google Cloud",
                                  "Credly", "https://www.credly.com/badges/wrong-uuid")
@@ -137,8 +137,8 @@ class ProfileSyncTests(unittest.TestCase):
                    "https://www.credly.com/badges/platform-leader-uuid", expires_date="2028-05-13"),
         ]
         findings = diff_badges(self.conn, badges)
-        genai_finding = next(f for f in findings if f["badge"]["name"].startswith("Generative"))
-        digital_leader_finding = next(f for f in findings if f["badge"]["name"].startswith("Cloud Digital"))
+        genai_finding = next(f for f in findings if f["badge"]["name"].startswith("Cloud GenAI"))
+        digital_leader_finding = next(f for f in findings if f["badge"]["name"].startswith("Platform"))
         self.assertEqual(genai_finding["kind"], "wrong_link")
         self.assertEqual(genai_finding["credential_id"], "gcp")
         self.assertEqual(digital_leader_finding["kind"], "new_credential")

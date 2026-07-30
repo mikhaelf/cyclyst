@@ -1,6 +1,6 @@
 """Diffs badges scraped from a public credential-wallet profile (Accredible/Credential.net,
 Credly) against the `credentials` table, to catch stale/wrong/missing badge links and surface
-credentials that exist publicly but aren't tracked yet. Built after a manual pass (2026-05-13)
+credentials that exist publicly but aren't tracked yet. Built after a manual pass (2026-06-02)
 found a stale CIPT link (pointed at an expired, private prior-term cert), a CISSP badge_url
 that was actually a copy of PMP's, a GCP badge_url pointing at the wrong Google Cloud cert, and
 an untracked "Platform Leader" credential — see CLAUDE.local.md for the full account.

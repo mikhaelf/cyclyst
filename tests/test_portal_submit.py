@@ -108,7 +108,7 @@ class PortalSubmitTests(unittest.TestCase):
         self.assertEqual(row["submitted_domain"], "Security and Risk Management")
 
     def test_suggest_isc2_mapping_conference_title(self):
-        activity = {"title": "Fieldstone Ventures Con - Tech and strategy", "category": None}
+        activity = {"title": "Fieldstone Con - Tech and Strategy", "category": None}
         mapping = suggest_isc2_mapping(activity)
         self.assertEqual(mapping["category"], "Education")
         self.assertEqual(mapping["cpe_type"], "Industry Conference")

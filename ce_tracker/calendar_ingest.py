@@ -18,9 +18,10 @@ from difflib import SequenceMatcher
 
 from .db import get_db
 
-# Tier 1 — providers already seen in this user's real activity history. A hit here (title or
-# organizer domain) is unflagged; everything else that stages is flagged for review.
-KNOWN_PROVIDERS = ["Northbridge Learning", "ISACA", "IAPP", "PMI", "ISC2", "Brightline Events", "Fieldstone Ventures", "Coursera", "SANS"]
+# Tier 1 — well-known CE providers/issuers, plus a couple of illustrative training-vendor
+# names (see README's fictional-provider convention). A hit here (title or organizer domain)
+# is unflagged; everything else that stages is flagged for review.
+KNOWN_PROVIDERS = ["Northbridge", "ISACA", "IAPP", "PMI", "ISC2", "Brightline", "Fieldstone", "Coursera", "SANS"]
 
 # Tier 3 — CE-intent terms drawn from the actual qualifying-activity categories in the PMI CCR
 # Handbook and ISC2 Certification Maintenance Handbook (Courses/Training, Organization
@@ -83,12 +84,12 @@ def score_event(event, known_providers=KNOWN_PROVIDERS, ce_keywords=CE_KEYWORDS,
     if not title or _contains_any(title, denylist):
         return None
 
-    # Title match ("Northbridge Learning Security Briefing") is a strong signal — the event is literally named
-    # after a known CE provider. Organizer-domain match alone is weaker: any event organized
-    # through a vendor's calendar system matches, including purely social ones (a real example
-    # caught in dry-run testing: an "Fieldstone Ventures"-organized "Networking Reception" matched on domain
-    # with zero CE content in the title). Domain match alone still stages as a candidate, but
-    # never earns the unflagged trust tier on its own — only a title hit does that.
+    # Title match ("Northbridge Learning Security Briefing") is a strong signal — the event is
+    # literally named after a known CE provider. Organizer-domain match alone is weaker: any
+    # event organized through a vendor's calendar system matches, including purely social ones
+    # (an illustrative example: a "Fieldstone"-organized "Networking Reception" matched on
+    # domain with zero CE content in the title). Domain match alone still stages as a
+    # candidate, but never earns the unflagged trust tier on its own — only a title hit does that.
     domain = _organizer_domain(event)
     provider_title_hit = next((p for p in known_providers if _word_in(p, title)), None)
     provider_domain_hit = next((p for p in known_providers if p.lower() in domain), None)

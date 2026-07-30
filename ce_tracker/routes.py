@@ -528,7 +528,7 @@ def import_agenda():
     from a certificate or issuer transcript): stages ONE aggregate candidate with a suggested
     total hours and an itemized breakdown via agenda_parse.parse()/stage() -- never a direct
     write to activities. `year` is optional and only used when the agenda's own date headers
-    don't include one (see agenda_parse.py's Meridian Security-style vs Fieldstone Ventures-style formats)."""
+    don't include one (see agenda_parse.py's Meridian-style vs Fieldstone-style formats)."""
     selected_id = request.args.get("selected")
     file_storage = request.files.get("agenda")
     year_raw = (request.form.get("year") or "").strip()

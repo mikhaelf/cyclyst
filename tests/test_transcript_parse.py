@@ -1,5 +1,5 @@
 """Tests for ce_tracker.transcript_parse — pure row-extraction over already-extracted text
-(including a regression fixture taken from a real ISC2 "Official CPE Transcript" export),
+(including a regression fixture modeled on ISC2's "Official CPE Transcript" export format),
 plus stage_batch's dedup/auto-skip behavior over an in-memory database. No network calls, no
 fixture files on disk — PDFs used for the pypdf-integration checks are generated on the fly
 with reportlab, same approach as test_certificate_parse.py. Run with:
@@ -13,31 +13,31 @@ import unittest
 from ce_tracker.db import SCHEMA
 from ce_tracker.transcript_parse import extract_rows, parse, stage_batch
 
-# A real (anonymized member number aside) two-table excerpt from an actual ISC2 transcript
-# export's raw pypdf text extraction — used as a regression fixture so future regex changes
-# can't silently break parsing of the real thing this feature was built and validated against.
+# A two-table excerpt modeled on an ISC2 transcript export's raw pypdf text extraction — used
+# as a regression fixture so future regex changes can't silently break parsing of the shape
+# this feature was built and validated against.
 REAL_ISC2_EXCERPT = """Group A Credits (minimum 20)
 Activity Date Activity Description CPE Type Credit
-19-Nov-2025 Cedar Valley Symposium Online webinars, podcasts and other
+3-Dec-2025 Cedar Valley Symposium Online webinars, podcasts and other
 online materials
-4.00
-7-Aug-2024 Purple Fun Con 2024 Industry Conference 14.00
-22-Apr-2024 2024 ISACA Spring Conference Industry Conference 6.00
-Total  Credits: Group A 24.00
-Certification awarded on Mar 28, 2006
-Start date: Apr 1, 2024
-End date: Mar 31, 2027
+5.00
+22-Aug-2024 Purple Fun Con 2024 Industry Conference 12.00
+6-May-2024 2024 ISACA Spring Conference Industry Conference 8.00
+Total  Credits: Group A 25.00
+Certification awarded on Feb 9, 2006
+Start date: Jun 1, 2024
+End date: May 31, 2027
 CPE progress
 30% Satisfied
 Group A Credits (minimum 90)
 Activity Date Activity Description CPE Type Credit
-1-Apr-2024 Rollover - Term ending Mar 31, 2027 CPE Rollover 2.00
-19-Nov-2025 Cedar Valley Symposium Online webinars, podcasts and
+1-Jun-2024 Rollover - Term ending May 31, 2027 CPE Rollover 3.00
+3-Dec-2025 Cedar Valley Symposium Online webinars, podcasts and
 other online materials
-4.00
-7-Aug-2024 Purple Fun Con 2024 Industry Conference 14.00
-22-Apr-2024 2024 ISACA Spring Conference Industry Conference 6.00
-Total  Credits: Group A 26.00
+5.00
+22-Aug-2024 Purple Fun Con 2024 Industry Conference 12.00
+6-May-2024 2024 ISACA Spring Conference Industry Conference 8.00
+Total  Credits: Group A 28.00
 Candidate and Member Services
 """
 
@@ -83,19 +83,19 @@ class ExtractRowsTests(unittest.TestCase):
         self.assertEqual(rollovers[0]["cpe_type"], "CPE Rollover")
 
     def test_real_isc2_excerpt_merges_shared_rows_and_excludes_rollover(self):
-        # Same 3 real activities printed once under a "minimum 20" table and once under a
+        # Same 3 activities printed once under a "minimum 20" table and once under a
         # "minimum 90" table (an ISC2 concentration sharing the base credential's Group A
         # pool) — must collapse to 3 unique candidates, not 6, and the Rollover row must not
         # become a fourth.
         candidates, rollovers = extract_rows(REAL_ISC2_EXCERPT)
         titles = sorted(c["title"] for c in candidates)
-        self.assertEqual(titles, ["2024 ISACA Spring Conference", "Purple Fun Con 2024", "Cedar Valley Symposium"])
+        self.assertEqual(titles, ["2024 ISACA Spring Conference", "Cedar Valley Symposium", "Purple Fun Con 2024"])
         self.assertEqual(len(rollovers), 1)
-        self.assertEqual(rollovers[0]["title"], "Rollover - Term ending Mar 31, 2027")
+        self.assertEqual(rollovers[0]["title"], "Rollover - Term ending May 31, 2027")
 
-        long_beach = next(c for c in candidates if c["title"] == "Cedar Valley Symposium")
-        self.assertEqual(long_beach["hours_guess"], 4.0)
-        self.assertEqual(long_beach["date"], "2025-11-19")
+        cedar_valley = next(c for c in candidates if c["title"] == "Cedar Valley Symposium")
+        self.assertEqual(cedar_valley["hours_guess"], 5.0)
+        self.assertEqual(cedar_valley["date"], "2025-12-03")
 
 
 class ParseEndToEndTests(unittest.TestCase):

@@ -32,7 +32,7 @@ class ScoreEventTests(unittest.TestCase):
         e = _event("Northbridge Learning Security Briefing", "2026-06-15T09:00:00-07:00", "2026-06-15T11:00:00-07:00")
         result = score_event(e)
         self.assertIsNotNone(result)
-        self.assertEqual(result["provider"], "Northbridge Learning")
+        self.assertEqual(result["provider"], "Northbridge")
         self.assertEqual(result["hours_guess"], 2.0)
         self.assertFalse(result["flagged"])
 
@@ -52,7 +52,7 @@ class ScoreEventTests(unittest.TestCase):
     def test_non_ce_social_event_from_known_domain_is_flagged_not_trusted(self):
         e = _event(
             "Networking Reception", "2026-06-04T18:00:00-07:00", "2026-06-04T21:00:00-07:00",
-            organizer_email="events@fieldstone ventures.com",
+            organizer_email="events@fieldstonevc.com",
         )
         result = score_event(e)
         self.assertIsNotNone(result)  # still staged as a candidate...

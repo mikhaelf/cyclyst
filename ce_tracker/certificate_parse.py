@@ -13,7 +13,7 @@ from pypdf import PdfReader
 KNOWN_PROVIDERS = [
     "ISACA", "ISC2", "(ISC)²", "PMI", "IAPP", "Credly", "SANS", "GIAC", "CompTIA",
     "Salesforce", "AWS", "Amazon Web Services", "Google Cloud", "Microsoft", "Coursera",
-    "Udemy", "LinkedIn Learning", "Northbridge Learning", "Pluralsight", "edX",
+    "Udemy", "LinkedIn Learning", "Northbridge", "Pluralsight", "edX",
 ]
 
 _MONTHS = "January|February|March|April|May|June|July|August|September|October|November|December"

@@ -4,21 +4,21 @@ transcript_parse.py for those).
 
 Stages ONE aggregate candidate per uploaded agenda -- a suggested total hours (summed from
 non-denied sessions) plus an itemized breakdown for human review -- rather than one row per
-session: a conference is logged as a single activity (see e.g. "Fieldstone Ventures Con - Tech and
-strategy" in real usage), and there's no existing "merge several approved rows into one
+session: a conference is logged as a single activity (see e.g. "Fieldstone Con: Tech &
+Strategy" as an example), and there's no existing "merge several approved rows into one
 activity" step that per-session staging would need.
 
-Deliberately supports exactly two formats, each validated against exactly one real sample --
+Deliberately supports exactly two formats, each validated against exactly one sample agenda --
 same honestly-narrow scope as transcript_parse.py's ISC2-only caveat, just two branches
 instead of one. A third company's agenda is not guaranteed to fit either:
 
-- "Meridian Security-style": day headers with no year ("Monday | June 22"), explicit start-end time
+- "Meridian-style": day headers with no year ("Monday | June 22"), explicit start-end time
   ranges ("8:40 AM - 9:30 AM Description"). The missing year must come from the caller
   (see `default_year`) -- never guessed.
-- "Fieldstone Ventures-style": day headers with a year ("Thursday, June 4, 2026"), bulleted single start
-  times with no explicit end ("9:00 a.m. - Description") -- duration is inferred from the
-  next timestamped line's start time, which is only knowable for a session that isn't the
-  last one of its day.
+- "Fieldstone-style": day headers with a year ("Thursday, June 4, 2026"), bulleted single
+  start times with no explicit end ("9:00 a.m. - Description") -- duration is inferred from
+  the next timestamped line's start time, which is only knowable for a session that isn't
+  the last one of its day.
 """
 import re
 from datetime import date

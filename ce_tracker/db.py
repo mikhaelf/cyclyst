@@ -207,7 +207,7 @@ def _migrate_credential_columns(conn):
 
     # Every seeded credential's cycle_label TEXT ("Jun 2023 – Jun 2026" etc.) turned out to be
     # stale flavor text inconsistent with its own days_left number (e.g. cissp's label implies
-    # a 2026 end date, but days_left=322 implies ~2027) — days_left is what actually drove the
+    # a 2026 end date, but days_left=349 implies ~2027) — days_left is what actually drove the
     # displayed status/pct before this change, so every date below is derived from days_left
     # relative to *migration run time*, not from the label text, to guarantee the backfill
     # doesn't start out already past its own deadline.

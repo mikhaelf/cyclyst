@@ -1,6 +1,6 @@
-"""Tests for ce_tracker.agenda_parse. Cases are drawn from two real event agendas (a
-multi-day conference, Meridian Security-style: no year, explicit time ranges; a single-day executive
-retreat, Fieldstone Ventures-style: year included, start-time-only) to keep both the denylist and the
+"""Tests for ce_tracker.agenda_parse. Cases are modeled on two illustrative event agendas (a
+multi-day conference, Meridian-style: no year, explicit time ranges; a single-day executive
+retreat, Fieldstone-style: year included, start-time-only) to keep both the denylist and the
 date/time parsing evidence-based rather than speculative. Run with:
     python -m unittest discover -s tests
 """
@@ -80,8 +80,8 @@ class NotDeniedLinesTests(unittest.TestCase):
             "An Optimistic Outlook on the AI Arms Race. Noah Bennett, Co-founder & "
             "VP Product, Meridian Security",
             "Industry Spotlight Panel: Harnessing AI and Eliminating Exposure to AI Threats",
-            "Building Defensive AI at the Frontier: Lessons from Anthropic's Mythos",
-            "Session I: Straight from the Top: Fieldstone Ventures's CEO Panel with Robert Hale",
+            "Building Defensive AI at the Frontier: Lessons from a Research Lab's Mythos",
+            "Session I: Straight from the Top: Fieldstone's CEO Panel with Robert Hale",
             "Session II: Frontline Decisions: Cybersecurity at the Executive Level "
             "(Identity + AI)",
             "Session III: Client Perspective & Open Discussion",
@@ -101,7 +101,7 @@ class NotDeniedLinesTests(unittest.TestCase):
         self.assertFalse(is_non_content("Breakout Session: Zero Trust Deep Dive"))
 
 
-class ExtractSessionsWizStyleTests(unittest.TestCase):
+class ExtractSessionsMeridianStyleTests(unittest.TestCase):
     """No-year day headers, explicit start-end time ranges."""
 
     def test_requires_default_year(self):
@@ -148,7 +148,7 @@ class ExtractSessionsWizStyleTests(unittest.TestCase):
         self.assertNotIn("12:00", sessions[0]["description"])
 
 
-class ExtractSessionsOptivStyleTests(unittest.TestCase):
+class ExtractSessionsFieldstoneStyleTests(unittest.TestCase):
     """Day headers with year included, bulleted start-time-only entries."""
 
     def test_resolves_dates_without_default_year(self):
@@ -226,43 +226,43 @@ class ParseEndToEndTests(unittest.TestCase):
         buf.seek(0)
         return buf
 
-    def test_wiz_style_end_to_end_with_year(self):
+    def test_meridian_style_end_to_end_with_year(self):
         pdf = self._make_pdf([
             "Tuesday | June 23",
             "8:40 AM - 9:30 AM Opening Fireside Chat",
             "9:30 AM - 10:30 AM An Optimistic Outlook on the AI Arms Race",
             "11:00 AM - 11:30 AM Break",
         ])
-        candidate, error = parse(_FakeFileStorage("Meridian Security Agenda.pdf", pdf), default_year=2026)
+        candidate, error = parse(_FakeFileStorage("Meridian Agenda.pdf", pdf), default_year=2026)
         self.assertIsNone(error)
         self.assertEqual(candidate["hours_guess"], 1.83)  # 50min (0.83h) + 60min (1.0h)
         self.assertEqual(candidate["date"], "2026-06-23")
-        self.assertEqual(candidate["title"], "Meridian Security Agenda")
+        self.assertEqual(candidate["title"], "Meridian Agenda")
         self.assertIsNone(candidate["provider"])
         self.assertEqual(candidate["applies"], "")
         self.assertEqual(candidate["source"], "agenda_pdf")
 
-    def test_wiz_style_without_year_returns_specific_error(self):
+    def test_meridian_style_without_year_returns_specific_error(self):
         pdf = self._make_pdf([
             "Tuesday | June 23",
             "8:40 AM - 9:30 AM Opening Fireside Chat",
         ])
-        candidate, error = parse(_FakeFileStorage("Meridian Security Agenda.pdf", pdf), default_year=None)
+        candidate, error = parse(_FakeFileStorage("Meridian Agenda.pdf", pdf), default_year=None)
         self.assertIsNone(candidate)
         self.assertIn("year", error)
 
-    def test_optiv_style_end_to_end_no_year_needed(self):
+    def test_fieldstone_style_end_to_end_no_year_needed(self):
         pdf = self._make_pdf([
             "Thursday, June 4, 2026",
             "9:00 a.m. - Session I: Straight from the Top",
             "10:30 a.m. - Session II: Frontline Decisions",
             "12:00 p.m. - Hosted Coastal Lunch Experience",
         ])
-        candidate, error = parse(_FakeFileStorage("Fieldstone Ventures Retreat.pdf", pdf), default_year=None)
+        candidate, error = parse(_FakeFileStorage("Fieldstone Retreat.pdf", pdf), default_year=None)
         self.assertIsNone(error)
         self.assertEqual(candidate["hours_guess"], 3.0)  # two 1.5h sessions
         self.assertEqual(candidate["date"], "2026-06-04")
-        self.assertEqual(candidate["title"], "Fieldstone Ventures Retreat")
+        self.assertEqual(candidate["title"], "Fieldstone Retreat")
 
     def test_no_countable_sessions_returns_error(self):
         pdf = self._make_pdf(["Just some unrelated document text with no agenda markers."])

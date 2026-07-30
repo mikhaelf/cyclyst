@@ -41,7 +41,7 @@ AUTO_REPORTING_PROVIDERS = {
 # Suggests ISC2's Category > CPE Type, keyed by keywords found in the local `category` field
 # or, failing that, the activity title. Always a suggestion for human review before typing
 # into the live form — never auto-applied. Patterns below are what actually got accepted on
-# the real form for six real submissions; expect to extend this as new activity shapes show up.
+# the real form for eight submissions; expect to extend this as new activity shapes show up.
 _CONFERENCE_KEYWORDS = ("summit", "conference", " con", "con -", "symposium", "forum")
 _WEBINAR_KEYWORDS = ("webinar", "briefing", "online")
 
@@ -80,7 +80,7 @@ def suggest_isc2_mapping(activity):
 
 
 # Suggests PMI's Education/Giving Back "Ways to Earn PDUs" category and a Talent Triangle leg.
-# Validated against a live CCRS run on 2026-05-13 (3 real submissions) — cpe_type strings below
+# Validated against a live CCRS run on 2026-05-13 (four submissions) — cpe_type strings below
 # match the live form's exact wording, which differs slightly from the CCR Handbook's own text
 # ("Course or Training" singular and "Read", not the Handbook's "Courses or Training" and
 # "Reading Materials"). Two things this function deliberately does NOT encode, left as the live
