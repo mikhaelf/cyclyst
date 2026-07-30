@@ -991,6 +991,20 @@ def _credential_and_in_cycle_activities(conn, credential_id):
     return row, categories, activities, in_cycle
 
 
+_CSV_FORMULA_PREFIXES = ("=", "+", "-", "@")
+
+
+def _csv_safe(value):
+    """Neutralizes CSV/formula injection (CWE-1236): a cell value starting with =, +, -, or @
+    is interpreted as a live formula by Excel/Sheets on open. Prefixing with a single quote
+    forces text interpretation; both apps strip the leading quote on display, so this is
+    invisible to the user while preventing the value from ever executing as a formula."""
+    text = str(value)
+    if text.startswith(_CSV_FORMULA_PREFIXES):
+        return "'" + text
+    return text
+
+
 @bp.route("/credentials/<credential_id>/export.csv")
 def export_activities_csv(credential_id):
     conn = get_db()
@@ -1003,7 +1017,15 @@ def export_activities_csv(credential_id):
     writer = csv.writer(buf)
     writer.writerow(["Date", "Provider", "Title", "Hours", "Category", "Applies To", "Status"])
     for a in in_cycle:
-        writer.writerow([a["date"], a["provider"] or "", a["title"], a["hours"], a["category"] or "", a["applies"], a["status"]])
+        writer.writerow([
+            a["date"],
+            _csv_safe(a["provider"] or ""),
+            _csv_safe(a["title"]),
+            a["hours"],
+            _csv_safe(a["category"] or ""),
+            _csv_safe(a["applies"]),
+            a["status"],
+        ])
 
     filename = f"{row['id']}-activities-{date.today().isoformat()}.csv"
     return Response(
