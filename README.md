@@ -383,6 +383,27 @@ deliberately unusual, and requires a separate tool this repo does not provide:
   category an event belongs to — you fill those in at approval. Duplicates of activities
   you already logged are detected and labeled with a confidence score.
 
+### Starting a calendar-ingestion session
+
+This repo never opens an AI session on its own — you start one, the same way you'd start any
+Claude Code or claude.ai session, and attach the Google Calendar connector to it:
+
+1. **Open a Claude session with the Google Calendar MCP connector enabled.** In Claude Code,
+   that means the connector is attached for the session (check `claude mcp list`, or your
+   client's connector/integration settings); in claude.ai, turn on the Google Calendar
+   integration before you start chatting. You do **not** need to be inside this repo's
+   directory for this step — it's just Claude talking to your calendar.
+2. **Ask it, in your own words, to export recent events to a file** — e.g. *"Export my Google
+   Calendar events from the last 30 days to a file called `events.json`."* This is the point
+   where your calendar data leaves your machine, passes through Google's API to that session,
+   and comes back down as a plain JSON file — nothing from this repo is involved yet.
+3. **Run the CLI yourself** against that file, from this repo's directory with the venv active:
+   ```bash
+   python -m ce_tracker.calendar_ingest --events-file events.json
+   ```
+   This step is pure local Python — no network call, no AI session needed for it.
+4. **Open the running app's Pending Review tab** and approve or dismiss what got staged.
+
 Gmail ingestion (course-completion emails, registration receipts) is a planned follow-up
 and intentionally not built yet.
 
@@ -500,6 +521,38 @@ requires a separate AI-assistant session with browser access. Nothing here runs 
   time, with an explicit go/no-go before each submission. This is the project's hard rule —
   no autonomous portal submission, ever, no batch auto-submit — made concrete.
 
+### Starting a portal-submission session
+
+Same principle as calendar ingestion — you start and supervise the AI session; this repo only
+provides the CLI it's paired with:
+
+1. **Install Claude for Chrome and grant it site permission** for the issuer portal you'll use
+   (e.g. `cpe.isc2.org`, `ccrs.pmi.org`), and make sure you're already logged into that portal
+   in the same browser profile. The automation drives your existing logged-in session — it
+   never handles your issuer-portal password.
+2. **Run `list-ready` yourself first**, before involving any AI session, to see what's actually
+   queued and what mapping it suggests:
+   ```bash
+   python -m ce_tracker.portal_submit list-ready --credential cissp
+   ```
+3. **Open a Claude Code or claude.ai session with Claude-in-Chrome enabled** and ask it, in your
+   own words, to walk the queue with you — e.g. *"Using cpe.isc2.org in this browser tab, help
+   me submit these CPE activities one at a time — show me each one, including a duplicate check
+   against my existing CPE List, before you submit anything."* This is the point where whatever
+   is on the portal page is processed by Claude for the duration of that session.
+4. **Give an explicit yes/no for each activity** before it lets the session submit — this is
+   the hard rule from [Design principles](#design-principles), not a suggestion.
+5. **After each approved submission, record it** (you can ask the same session to run this, or
+   run it yourself):
+   ```bash
+   python -m ce_tracker.portal_submit record-submission --activity-id 42 --credential cissp \
+       --source automation --category Education --cpe-type "Industry Conference" \
+       --domain "Security and Risk Management"
+   ```
+6. **Reconcile later**, once the portal's own processing delay has passed, with
+   `list-pending-reconcile` and `confirm-submission` (see the full walkthrough below) — this
+   can be a separate session started any time after the wait.
+
 The example below uses fictional providers/events to show the shape of a real ISC2 run:
 
 ```
@@ -566,6 +619,59 @@ Every flag on every subcommand above has its own `--help` text (`python -m ce_tr
 you'll use most.
 
 ## Architecture
+
+**At a glance** — solid arrows are always local; dashed arrows are the only points where data
+leaves your machine, and both only exist for the duration of a session you start yourself:
+
+```mermaid
+flowchart TB
+    subgraph local["Your machine — always local, all the time"]
+        you["You, in a browser"]
+        flask["Flask app (run.py)"]
+        db[("SQLite: tracker.db")]
+        pending["pending_activities table"]
+        activities["activities table"]
+        ledger["activity_portal_submissions ledger"]
+
+        you <--> flask
+        flask <--> db
+        db --- pending
+        db --- activities
+        db --- ledger
+        pending -->|"human approve / dismiss"| activities
+    end
+
+    subgraph calendar["Optional — Calendar ingestion (needs a live MCP session)"]
+        gcal[("Google Calendar")]
+        claudecal["Claude session<br/>+ Calendar MCP connector"]
+        eventsjson["events.json"]
+        ingestcli["calendar_ingest.py CLI"]
+
+        gcal -.->|"reads events —<br/>data leaves machine"| claudecal
+        claudecal --> eventsjson
+        eventsjson --> ingestcli
+    end
+    ingestcli -->|"stages candidates"| pending
+
+    subgraph portal["Optional — Portal submission (needs a live MCP session)"]
+        readycli["portal_submit.py<br/>list-ready"]
+        claudechrome["Claude-in-Chrome session"]
+        issuer[("Issuer portal —<br/>cpe.isc2.org / ccrs.pmi.org")]
+        recordcli["portal_submit.py<br/>record-submission"]
+
+        readycli --> claudechrome
+        claudechrome -.->|"drives browser —<br/>page content leaves machine"| issuer
+        claudechrome -->|"human go/no-go<br/>per record"| recordcli
+    end
+    activities --> readycli
+    recordcli --> ledger
+```
+
+The core loop (top box) is a closed system: your browser, the Flask app, and one SQLite file.
+Neither optional feature is reachable from inside that loop — `calendar_ingest.py` and
+`portal_submit.py` are separate CLI entry points that a *human* runs, fed by a separate AI
+session the human also starts and supervises. There is no code path from `run.py` into Claude
+or any MCP connector.
 
 Single-language Python stack, chosen for hackability over ceremony:
 
