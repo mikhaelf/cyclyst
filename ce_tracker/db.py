@@ -263,6 +263,21 @@ def _migrate_member_id_column(conn):
         )
 
 
+def _migrate_credential_identity_columns(conn):
+    """Adds `cert_number` (the issuer's own certification/credential number, e.g. PMI's
+    "Certification Number" on a PMP certificate — distinct from `member_id`, which is an
+    account/membership ID with the issuer, not the credential itself) and
+    `original_grant_date` (the date the credential was first earned — PMI's certificate
+    calls this "Original Grant Date"; design doc §3 sketched it as `issued`). Both optional,
+    no backfill: these are personal certificate details only you can supply, via the Add/Edit
+    Credential form."""
+    existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(credentials)")}
+    if "cert_number" not in existing_cols:
+        conn.execute("ALTER TABLE credentials ADD COLUMN cert_number TEXT")
+    if "original_grant_date" not in existing_cols:
+        conn.execute("ALTER TABLE credentials ADD COLUMN original_grant_date TEXT")  # ISO date
+
+
 def _migrate_dependency_any_of_column(conn):
     """`depends_on` (existing, design doc §3/§9) expresses a single hard AND-dependency —
     Salesforce-style: this credential is invalid if that one lapses. Some real credentials
@@ -412,6 +427,7 @@ def init_db():
     conn.executescript(SCHEMA)
     _migrate_credential_columns(conn)
     _migrate_member_id_column(conn)
+    _migrate_credential_identity_columns(conn)
     _migrate_dependency_any_of_column(conn)
     _migrate_category_parent_column(conn)
     _migrate_grace_period_backfill(conn)

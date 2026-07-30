@@ -35,10 +35,14 @@ def build_activity_report_pdf(credential_row, in_cycle_activities, category_resu
 
     title = credential_row["name"]
     if credential_row["member_id"]:
-        title += f" · {credential_row['member_id']}"
+        title += f" · Member {credential_row['member_id']}"
+    if credential_row["cert_number"]:
+        title += f" · Cert# {credential_row['cert_number']}"
     story.append(Paragraph(title, styles["Title"]))
 
     subtitle_bits = [credential_row["issuer"]]
+    if credential_row["original_grant_date"]:
+        subtitle_bits.append(f"Granted {credential_row['original_grant_date']}")
     if credential_row["cycle_start_date"] and credential_row["cycle_end_date"]:
         subtitle_bits.append(f"{credential_row['cycle_start_date']} to {credential_row['cycle_end_date']}")
     story.append(Paragraph(" &middot; ".join(subtitle_bits), styles["Normal"]))

@@ -134,9 +134,19 @@
         {% if credential_form_errors.get('name') %}<div class="form-error">{{ credential_form_errors['name'] }}</div>{% endif %}
         {% if credential_form_errors.get('issuer') %}<div class="form-error">{{ credential_form_errors['issuer'] }}</div>{% endif %}
 
-        <label>Member / cert ID (optional)
-          <input type="text" name="member_id" value="{{ credential_form_values.get('member_id', '') }}" placeholder="e.g. 123456">
+        <div class="cf-row">
+          <label>Member ID (optional)
+            <input type="text" name="member_id" value="{{ credential_form_values.get('member_id', '') }}" placeholder="e.g. 123456">
+          </label>
+          <label>Certification number (optional)
+            <input type="text" name="cert_number" value="{{ credential_form_values.get('cert_number', '') }}" placeholder="e.g. 1234567">
+          </label>
+        </div>
+
+        <label>Original grant date (optional)
+          <input type="date" name="original_grant_date" value="{{ credential_form_values.get('original_grant_date', '') }}">
         </label>
+        {% if credential_form_errors.get('original_grant_date') %}<div class="form-error">{{ credential_form_errors['original_grant_date'] }}</div>{% endif %}
 
         <label>Renewal type*
           <select name="renewal_type" id="cf-renewal-type" onchange="cfToggleRenewalType()">
@@ -286,8 +296,8 @@
     {% elif credential %}
     <div class="detail-header">
       <div>
-        <div class="detail-name">{{ credential.name }}{% if credential.member_id %} <span class="detail-member-id">· <span class="member-id-value" data-full="{{ credential.member_id }}" data-masked="{{ credential.member_id_masked }}" title="Click to reveal/hide" onclick="this.textContent = (this.textContent === this.dataset.masked ? this.dataset.full : this.dataset.masked)">{{ credential.member_id_masked }}</span></span>{% endif %}</div>
-        <div class="detail-sub">{{ credential.issuer }} · {{ credential.cycle_label }}</div>
+        <div class="detail-name">{{ credential.name }}{% if credential.member_id %} <span class="detail-member-id">· Member <span class="member-id-value" data-full="{{ credential.member_id }}" data-masked="{{ credential.member_id_masked }}" title="Click to reveal/hide" onclick="this.textContent = (this.textContent === this.dataset.masked ? this.dataset.full : this.dataset.masked)">{{ credential.member_id_masked }}</span></span>{% endif %}{% if credential.cert_number %} <span class="detail-member-id">· Cert# {{ credential.cert_number }}</span>{% endif %}</div>
+        <div class="detail-sub">{{ credential.issuer }} · {{ credential.cycle_label }}{% if credential.original_grant_date_label %} · Granted {{ credential.original_grant_date_label }}{% endif %}</div>
       </div>
       <div class="detail-status">
         <div class="status-label" style="color:{{ credential.status_color }}">{{ credential.status_label }}</div>

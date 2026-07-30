@@ -106,6 +106,12 @@ def _cycle_label(row):
     return row["cycle_label"]
 
 
+def _original_grant_date_label(row):
+    if not row["original_grant_date"]:
+        return None
+    return f"{date.fromisoformat(row['original_grant_date']):%b %d, %Y}"
+
+
 def _earned_label(row, prog):
     if row["total"] is None:
         return "No CE hours tracked for this credential."
@@ -182,6 +188,8 @@ def credential_view(row, conn, show_archived=False):
         "issuer": row["issuer"],
         "member_id": row["member_id"],
         "member_id_masked": _mask_member_id(row["member_id"]),
+        "cert_number": row["cert_number"],
+        "original_grant_date_label": _original_grant_date_label(row),
         "cycle_label": _cycle_label(row),
         "days_left": prog["days_left"],
         "days_label": _days_label(status, prog["days_left"], prog["grace_days_left"]),

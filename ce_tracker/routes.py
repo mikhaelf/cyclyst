@@ -192,6 +192,8 @@ def _parse_credential_form(form):
         "name": name,
         "issuer": issuer,
         "member_id": (form.get("member_id") or "").strip(),
+        "cert_number": (form.get("cert_number") or "").strip(),
+        "original_grant_date": (form.get("original_grant_date") or "").strip(),
         "renewal_type": renewal_type,
         "cycle_start_date": (form.get("cycle_start_date") or "").strip(),
         "cycle_years": (form.get("cycle_years") or "").strip(),
@@ -215,6 +217,13 @@ def _parse_credential_form(form):
     grace_period_days = None
     manual_adjustment_hours = None
     annual_minimum_type = values["annual_minimum_type"] if values["annual_minimum_type"] in ("suggested", "mandatory") else None
+
+    original_grant_date = None
+    if values["original_grant_date"]:
+        try:
+            original_grant_date = date.fromisoformat(values["original_grant_date"])
+        except ValueError:
+            errors["original_grant_date"] = "Enter a valid date, or leave blank."
 
     if renewal_type == "cpe_hours":
         if not values["cycle_start_date"]:
@@ -319,6 +328,7 @@ def _parse_credential_form(form):
 
     parsed = {
         "renewal_type": renewal_type,
+        "original_grant_date": original_grant_date.isoformat() if original_grant_date else None,
         "cycle_start_date": cycle_start_date.isoformat() if cycle_start_date else None,
         "cycle_end_date": cycle_end_date.isoformat() if cycle_end_date else None,
         "reporting_calendar": values["reporting_calendar"] if renewal_type == "cpe_hours" else None,
@@ -754,12 +764,14 @@ def create_credential():
     new_id = _slugify(values["name"], existing_ids)
 
     conn.execute(
-        "INSERT INTO credentials (id, name, issuer, member_id, status, renewal_type, cycle_start_date, cycle_end_date, "
+        "INSERT INTO credentials (id, name, issuer, member_id, cert_number, original_grant_date, status, "
+        "renewal_type, cycle_start_date, cycle_end_date, "
         "reporting_calendar, unit, total, annual_minimum, annual_minimum_type, grace_period_days, "
         "manual_adjustment_hours, note, badge_platform, badge_url, badge_visibility) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
         (
-            new_id, values["name"], values["issuer"], values["member_id"] or None, "on-track", parsed["renewal_type"],
+            new_id, values["name"], values["issuer"], values["member_id"] or None,
+            values["cert_number"] or None, parsed["original_grant_date"], "on-track", parsed["renewal_type"],
             parsed["cycle_start_date"], parsed["cycle_end_date"], parsed["reporting_calendar"],
             parsed["unit"], parsed["total"], parsed["annual_minimum"], parsed["annual_minimum_type"],
             parsed["grace_period_days"], parsed["manual_adjustment_hours"], values["note"] or None,
@@ -811,6 +823,8 @@ def edit_credential_form(credential_id):
         "name": row["name"],
         "issuer": row["issuer"],
         "member_id": row["member_id"] or "",
+        "cert_number": row["cert_number"] or "",
+        "original_grant_date": row["original_grant_date"] or "",
         "renewal_type": row["renewal_type"],
         "cycle_start_date": row["cycle_start_date"] or "",
         "cycle_years": cycle_years,
@@ -850,11 +864,14 @@ def update_credential(credential_id):
 
     conn = get_db()
     conn.execute(
-        "UPDATE credentials SET name=?, issuer=?, member_id=?, renewal_type=?, cycle_start_date=?, cycle_end_date=?, "
+        "UPDATE credentials SET name=?, issuer=?, member_id=?, cert_number=?, original_grant_date=?, "
+        "renewal_type=?, cycle_start_date=?, cycle_end_date=?, "
         "reporting_calendar=?, unit=?, total=?, annual_minimum=?, annual_minimum_type=?, grace_period_days=?, "
         "manual_adjustment_hours=?, note=?, badge_platform=?, badge_url=?, badge_visibility=? WHERE id=?",
         (
-            values["name"], values["issuer"], values["member_id"] or None, parsed["renewal_type"], parsed["cycle_start_date"],
+            values["name"], values["issuer"], values["member_id"] or None,
+            values["cert_number"] or None, parsed["original_grant_date"],
+            parsed["renewal_type"], parsed["cycle_start_date"],
             parsed["cycle_end_date"], parsed["reporting_calendar"], parsed["unit"], parsed["total"],
             parsed["annual_minimum"], parsed["annual_minimum_type"], parsed["grace_period_days"],
             parsed["manual_adjustment_hours"], values["note"] or None,
