@@ -32,9 +32,14 @@ def _credential(**overrides):
     return row
 
 
-def _activity(activity_date, hours=1.0, category=None):
+def _activity(activity_date, hours=1.0, category=None, confirmed=False):
     # Dates stay ISO strings, matching storage — _in_window compares them lexicographically.
-    return {"date": activity_date, "hours": hours, "category": category}
+    # confirmed=True mimics views.py's join onto activity_portal_submissions.confirmation_id —
+    # required for an activity to count toward carryover (see progress._carryover_eligible).
+    return {
+        "date": activity_date, "hours": hours, "category": category,
+        "portal_confirmation_id": "CLAIM-1" if confirmed else None,
+    }
 
 
 def _category(cat_id, name, target, rule_type="min", parent_id=None, manual_adjustment=None):
@@ -174,13 +179,25 @@ class CarryoverTests(unittest.TestCase):
 
     def test_carryover_within_cap_counts_fully_on_top_of_logged(self):
         activities = [
-            _activity("2024-01-01", 5.0),   # prior-cycle final year — carryover-eligible
+            _activity("2024-01-01", 5.0, confirmed=True),   # prior-cycle final year — carryover-eligible
             _activity("2025-06-01", 3.0),   # inside current cycle window
         ]
         result = compute_progress(_credential(carryover_max_hours=20.0, carryover_window_days=365), activities, [], today=TODAY)
         self.assertEqual(result["earned_logged"], 3.0)
         self.assertEqual(result["carryover_earned"], 5.0)
         self.assertEqual(result["earned"], 8.0)
+
+    def test_unconfirmed_activity_in_carryover_window_does_not_count(self):
+        # Reproduces the real PMP mismatch this was built to fix: a locally-logged activity
+        # with no confirmation/claim ID from the issuer's portal was never actually submitted
+        # anywhere, so PMI (or any issuer) can't have chosen to carry it forward — regardless of
+        # how it's dated relative to the carryover window.
+        result = compute_progress(
+            _credential(carryover_max_hours=20.0, carryover_window_days=365),
+            [_activity("2024-01-01", 5.0)], [], today=TODAY,
+        )
+        self.assertEqual(result["carryover_earned"], 0.0)
+        self.assertEqual(result["earned"], 0.0)
 
     def test_activity_older_than_final_year_of_prior_cycle_is_excluded(self):
         # 2022-01-01 is well over 365 days before cycle_start (2024-05-01) — outside even the
@@ -196,8 +213,8 @@ class CarryoverTests(unittest.TestCase):
         # Raw carryover-eligible total is 20 against a cap of 10 -> factor 0.5, applied
         # uniformly rather than counting one activity fully and dropping the other.
         activities = [
-            _activity("2024-01-01", 15.0),
-            _activity("2024-02-01", 5.0),
+            _activity("2024-01-01", 15.0, confirmed=True),
+            _activity("2024-02-01", 5.0, confirmed=True),
         ]
         result = compute_progress(_credential(carryover_max_hours=10.0, carryover_window_days=365), activities, [], today=TODAY)
         self.assertEqual(result["carryover_earned"], 10.0)
@@ -219,7 +236,7 @@ class CarryoverTests(unittest.TestCase):
         # Mirrors the real PMP case: PDUs earned in the final year of the prior cycle, tagged
         # to a category, should roll forward into that same category's total this cycle.
         giving_back = _category(1, "Giving Back", 25, rule_type="max")
-        activities = [_activity("2024-01-01", 16.0, category="Giving Back")]
+        activities = [_activity("2024-01-01", 16.0, category="Giving Back", confirmed=True)]
         result = compute_progress(
             _credential(carryover_max_hours=20.0, carryover_window_days=365), activities, [giving_back], today=TODAY,
         )
@@ -231,8 +248,8 @@ class CarryoverTests(unittest.TestCase):
     def test_carryover_category_contribution_is_prorated_with_same_factor_as_total(self):
         giving_back = _category(1, "Giving Back", 25, rule_type="max")
         activities = [
-            _activity("2024-01-01", 15.0, category="Giving Back"),
-            _activity("2024-02-01", 5.0, category="Giving Back"),
+            _activity("2024-01-01", 15.0, category="Giving Back", confirmed=True),
+            _activity("2024-02-01", 5.0, category="Giving Back", confirmed=True),
         ]
         result = compute_progress(
             _credential(carryover_max_hours=10.0, carryover_window_days=365), activities, [giving_back], today=TODAY,

@@ -66,9 +66,21 @@ def _fetch_categories(conn, credential_id):
 
 
 def _fetch_applicable_activities(conn, credential_id):
+    # portal_confirmation_id feeds progress.py's carryover eligibility check (see
+    # progress._carryover_eligible): only activities with a real confirmation/claim ID on file
+    # for *this* credential can carry PDUs/CE forward into a new cycle, not just anything
+    # locally logged in the carryover window.
     return conn.execute(
-        "SELECT * FROM activities WHERE ',' || applies || ',' LIKE '%,' || ? || ',%' ORDER BY date DESC",
-        (credential_id,),
+        """
+        SELECT activities.*, activity_portal_submissions.confirmation_id AS portal_confirmation_id
+        FROM activities
+        LEFT JOIN activity_portal_submissions
+            ON activity_portal_submissions.activity_id = activities.id
+           AND activity_portal_submissions.credential_id = ?
+        WHERE ',' || activities.applies || ',' LIKE '%,' || ? || ',%'
+        ORDER BY activities.date DESC
+        """,
+        (credential_id, credential_id),
     ).fetchall()
 
 

@@ -27,6 +27,19 @@ def _sum_hours(activities, start=None, end=None, category=None):
     return total
 
 
+def _carryover_eligible(activities):
+    """Carryover can only include hours the issuer's own portal actually has on record — a
+    locally-logged activity that was never submitted anywhere can't possibly be something PMI
+    (or any issuer) chose to carry forward. `portal_confirmation_id` is populated by the caller
+    (views.py, joined from activity_portal_submissions) only when a real confirmation/claim ID
+    from the issuer's portal is on file for this credential — not merely a 'portal_confirmed'
+    ledger status, since that status has been set in bulk without individual verification before
+    (see the PMP carryover mismatch this was built to fix: the tracker showed 24h carried over
+    against PMI's actual 19h because it was summing every locally-logged activity in the window,
+    not just the ones PMI actually has a claim on file for)."""
+    return [a for a in activities if ("portal_confirmation_id" in a.keys()) and a["portal_confirmation_id"]]
+
+
 def _carryover_window(cycle_start, window_days):
     """Some issuers (confirmed: PMI, see ce-cpe-tracker-design.md §7b; sketched but unconfirmed
     for IAPP/AIGP) let hours earned in the final stretch of the *prior* cycle count toward this
@@ -46,15 +59,16 @@ def _carryover_window(cycle_start, window_days):
 
 def _carryover_factor(activities, cycle_start, cap, window_days):
     """How much of the prior-cycle final-window total actually counts, as a 0-1 fraction of each
-    matching activity's hours. The cap is a single total across every category (that's how
-    PMI's handbook states it — "a portion of the PDUs", not a per-category cap), so when the raw
-    total exceeds the cap, every category's carryover contribution is scaled down by the same
-    factor rather than picking which specific activities count — the handbook doesn't document
-    that choice as deterministic either."""
+    matching activity's hours. Only activities the issuer's own portal has actually confirmed
+    (see _carryover_eligible) count toward the raw total — the cap is a single total across
+    every category (that's how PMI's handbook states it — "a portion of the PDUs", not a
+    per-category cap), so when the raw total exceeds the cap, every category's carryover
+    contribution is scaled down by the same factor rather than picking which specific activities
+    count — the handbook doesn't document that choice as deterministic either."""
     if not cap or not window_days:
         return None, 0.0
     window = _carryover_window(cycle_start, window_days)
-    raw = _sum_hours(activities, start=window[0], end=window[1])
+    raw = _sum_hours(_carryover_eligible(activities), start=window[0], end=window[1])
     if raw <= 0:
         return window, 0.0
     return window, min(1.0, cap / raw)
@@ -104,7 +118,7 @@ def _compute_category_results(activities, categories, cycle_start, cycle_end,
         logged = _sum_hours(activities, start=cycle_start, end=cycle_end, category=cat["name"])
         if carryover_window and carryover_factor:
             logged += _sum_hours(
-                activities, start=carryover_window[0], end=carryover_window[1], category=cat["name"]
+                _carryover_eligible(activities), start=carryover_window[0], end=carryover_window[1], category=cat["name"]
             ) * carryover_factor
         adjustment = cat["manual_adjustment"] if "manual_adjustment" in cat.keys() else None
         return logged + (adjustment or 0)
@@ -188,7 +202,9 @@ def compute_progress(credential_row, activities, categories, today=None):
     )
     carryover_earned = 0.0
     if carryover_window and carryover_factor:
-        carryover_earned = _sum_hours(activities, start=carryover_window[0], end=carryover_window[1]) * carryover_factor
+        carryover_earned = _sum_hours(
+            _carryover_eligible(activities), start=carryover_window[0], end=carryover_window[1]
+        ) * carryover_factor
 
     earned = earned_logged + earned_adjustment + carryover_earned
     pct = min(100, round(earned / total * 100)) if total else 0
