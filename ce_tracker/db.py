@@ -157,6 +157,22 @@ CREATE TABLE IF NOT EXISTS activity_portal_submissions (
     recorded_at TEXT NOT NULL,  -- full timestamp (not just a date) — pending_reconciliation needs minute-level precision
     UNIQUE(activity_id, credential_id)
 );
+
+-- One row per web-app process start (see ce_tracker/run_summary.py) -- powers the "since
+-- your last run" banner. `dismissed` applies only to the most recent row: dismissing hides
+-- the banner for the rest of this run without affecting future runs.
+CREATE TABLE IF NOT EXISTS app_runs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at TEXT NOT NULL,
+    dismissed INTEGER NOT NULL DEFAULT 0
+);
+
+-- Single-row app-wide settings. Today just the permanent "never show me again" opt-out for
+-- the run-summary banner (distinct from app_runs.dismissed, which only lasts one run).
+CREATE TABLE IF NOT EXISTS app_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    run_summary_enabled INTEGER NOT NULL DEFAULT 1
+);
 """
 
 

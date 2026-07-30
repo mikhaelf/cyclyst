@@ -130,6 +130,25 @@ DOCS_SECTIONS = [
         """,
     },
     {
+        "id": "since-last-run",
+        "title": '"Since your last run" summary',
+        "body": """
+            <p class="docs-copy">A banner appears on startup summarizing issuer-portal
+            submissions recorded since the app was last started — nothing shows if there's
+            nothing new.</p>
+            <ul class="docs-steps">
+                <li>Click <strong>×</strong> to dismiss it for the rest of this run — it
+                returns fresh on your next <code>python run.py</code>.</li>
+                <li>Right after dismissing, a one-time prompt offers
+                <strong>Never show me again</strong> — a permanent opt-out. Ignore it and it
+                just goes away; it won't nag on a reload.</li>
+                <li>If you turn it off, come back to this Docs page any time — a
+                <strong>Turn back on</strong> button appears here whenever the summary is
+                off.</li>
+            </ul>
+        """,
+    },
+    {
         "id": "good-to-know",
         "title": "Good to know",
         "body": """

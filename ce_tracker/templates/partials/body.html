@@ -1,3 +1,22 @@
+{% if run_summary %}
+<div class="run-summary-banner">
+  <div class="run-summary-text">
+    Since your last run:
+    {% for s in run_summary %}{{ s.count }} CE{{ 's' if s.count != 1 else '' }} submitted to {{ s.issuer }} ({{ s.name }}){% if not loop.last %}, {% endif %}{% endfor %}
+  </div>
+  <button class="run-summary-dismiss"
+          hx-post="{{ url_for('main.dismiss_run_summary', selected=credential.id if credential else '', tab=tab) }}"
+          hx-target="#app-body" hx-swap="innerHTML" title="Dismiss">×</button>
+</div>
+{% elif run_summary_just_dismissed %}
+<div class="run-summary-banner run-summary-banner--followup">
+  <div class="run-summary-text">Won't show again this run.</div>
+  <button class="btn-secondary small"
+          hx-post="{{ url_for('main.disable_run_summary', selected=credential.id if credential else '', tab=tab) }}"
+          hx-target="#app-body" hx-swap="innerHTML">Never show me again</button>
+  <button class="run-summary-dismiss" onclick="this.closest('.run-summary-banner').remove()" title="Close">×</button>
+</div>
+{% endif %}
 <div class="app-shell">
   <aside class="sidebar">
     <div class="sidebar-title">
@@ -68,6 +87,15 @@
         <div class="detail-name">Docs</div>
         <div class="detail-sub">What you can do in Cyclyst, step by step.</div>
       </div>
+
+      {% if not run_summary_enabled %}
+      <div class="form-note">
+        The "since your last run" summary banner is turned off.
+        <button class="btn-secondary small"
+                hx-post="{{ url_for('main.enable_run_summary', selected=credential.id if credential else '') }}"
+                hx-target="#app-body" hx-swap="innerHTML">Turn back on</button>
+      </div>
+      {% endif %}
 
       <nav class="docs-toc" aria-label="Docs sections">
         <div class="docs-toc-label">On this page</div>

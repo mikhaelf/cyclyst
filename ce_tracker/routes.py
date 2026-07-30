@@ -5,7 +5,7 @@ from datetime import date
 
 from flask import Blueprint, Response, current_app, render_template, request
 
-from . import agenda_parse, certificate_parse, progress, reports, retention, transcript_parse, views
+from . import agenda_parse, certificate_parse, progress, reports, retention, run_summary, transcript_parse, views
 from .db import get_db
 from .docs_content import DOCS_SECTIONS
 
@@ -17,6 +17,13 @@ def _body_context(selected_id, tab, show_archived=False):
     sidebar = views.sidebar_credentials(conn)
     if not selected_id and sidebar:
         selected_id = sidebar[0]["id"]
+
+    run_summary_enabled = run_summary.summary_enabled(conn)
+    run_summary_items = None
+    if run_summary_enabled and not run_summary.is_current_run_dismissed(conn):
+        cutoff = run_summary.previous_run_started_at(conn)
+        run_summary_items = run_summary.submissions_since(conn, cutoff) or None
+
     context = {
         "sidebar": sidebar,
         "archived": views.archived_credentials(conn),
@@ -56,6 +63,9 @@ def _body_context(selected_id, tab, show_archived=False):
         "status_legend": views.STATUS_LEGEND,
         "show_archived": show_archived,
         "archive_note": None,
+        "run_summary": run_summary_items,
+        "run_summary_enabled": run_summary_enabled,
+        "run_summary_just_dismissed": False,
         "show_archive_form": False,
         "credential_form_view": False,
         "credential_form_mode": None,
@@ -344,6 +354,51 @@ def docs_fragment():
     selected_id = request.args.get("selected")
     tab = request.args.get("tab", "overview")
     context = _body_context(selected_id, tab)
+    context["docs_view"] = True
+    context["docs_sections"] = DOCS_SECTIONS
+    return render_template("partials/body.html", **context)
+
+
+@bp.route("/run-summary/dismiss", methods=["POST"])
+def dismiss_run_summary():
+    """Hides the "since your last run" banner for the rest of this run only (see
+    run_summary.dismiss_current_run) and shows a one-time follow-up offering the permanent
+    opt-out -- the follow-up itself isn't persisted, so it won't nag on a later reload."""
+    selected_id = request.args.get("selected")
+    tab = request.args.get("tab", "overview")
+
+    conn = get_db()
+    run_summary.dismiss_current_run(conn)
+    conn.close()
+
+    context = _body_context(selected_id, tab)
+    context["run_summary_just_dismissed"] = True
+    return render_template("partials/body.html", **context)
+
+
+@bp.route("/run-summary/never-show-again", methods=["POST"])
+def disable_run_summary():
+    selected_id = request.args.get("selected")
+    tab = request.args.get("tab", "overview")
+
+    conn = get_db()
+    run_summary.set_summary_enabled(conn, False)
+    conn.close()
+
+    return render_template("partials/body.html", **_body_context(selected_id, tab))
+
+
+@bp.route("/run-summary/enable", methods=["POST"])
+def enable_run_summary():
+    """Re-enable path for the permanent opt-out above, surfaced on the Docs page (see
+    templates/partials/body.html) since there's no other settings surface in the app."""
+    selected_id = request.args.get("selected")
+
+    conn = get_db()
+    run_summary.set_summary_enabled(conn, True)
+    conn.close()
+
+    context = _body_context(selected_id, "overview")
     context["docs_view"] = True
     context["docs_sections"] = DOCS_SECTIONS
     return render_template("partials/body.html", **context)

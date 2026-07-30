@@ -113,6 +113,10 @@ per-credential progress, pace status, and audit-ready reports.
   chosen number of years to declutter the Activity Log — a CSV backup is written first, and
   archiving never deletes anything or affects progress totals, reports, or duplicate
   detection. See [Activity Log retention](#activity-log-retention-optional) below.
+- **"Since your last run" summary:** a dismissible banner on startup summarizing issuer-portal
+  submissions recorded (via the CISSP submission automation below) since the app was last
+  started — e.g. "2 CEs submitted to ISC2 (CISSP)." See [Since your last run](#since-your-last-run-summary)
+  below.
 - **Quality-of-life:** public badge links (Credly / Credential.net), archived credentials,
   in-app docs, in-place editing of everything — no hand-editing the database.
 - **ISC2 portal submission automation (CISSP):** a submission-tracking ledger plus a
@@ -456,6 +460,22 @@ startup or scheduled purge.
 - There's deliberately no per-issuer-audit-window guidance baked in — issuers' own
   record-retention expectations vary and aren't tracked anywhere in this codebase, so picking
   a safe number of years is on you.
+
+## "Since your last run" summary
+
+A banner appears on startup summarizing issuer-portal submissions recorded (via [ISC2 portal
+submission automation](#isc2-portal-submission-automation-cissp-optional-mcp-assisted) below)
+since the app was last started — e.g. "Since your last run: 2 CEs submitted to ISC2 (CISSP)."
+Nothing shows if there's nothing new, and nothing shows on the very first run ever (there's
+no "since" to compare against yet).
+
+- **× dismisses it for the rest of this run** — reload or navigate and it stays gone, but it
+  comes back fresh on the next `python run.py`.
+- **Right after dismissing, a one-time prompt offers "Never show me again"** — a separate,
+  permanent opt-out. Ignore the prompt (navigate away) and it just goes away too; it's a
+  one-time offer, not a recurring nag.
+- **Turning it back on** after choosing "Never show me again" is done from the in-app Docs
+  page (📘 in the sidebar) — there's a "Turn back on" button there whenever the summary is off.
 
 ## ISC2 portal submission automation (CISSP, optional, MCP-assisted)
 

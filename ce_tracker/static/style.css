@@ -10,6 +10,24 @@ html, body {
 
 #app-body { height: 100%; padding: 24px; }
 
+.run-summary-banner {
+  display: flex; align-items: center; gap: 12px;
+  max-width: 1180px; margin: 0 auto 12px;
+  background: #eef6f1; border: 1px solid #cdeadd; border-radius: 8px;
+  padding: 10px 14px;
+}
+.run-summary-banner--followup { background: #f7f8fa; border-color: #eaecf0; }
+.run-summary-text {
+  flex: 1;
+  font: 600 12.5px -apple-system, sans-serif; color: #1f9d7c;
+}
+.run-summary-banner--followup .run-summary-text { color: #344054; }
+.run-summary-dismiss {
+  flex: none; border: none; background: transparent; cursor: pointer;
+  font: 700 16px -apple-system, sans-serif; color: #98a2b3; line-height: 1; padding: 2px 4px;
+}
+.run-summary-dismiss:hover { color: #667085; }
+
 .app-shell {
   display: flex;
   height: calc(100vh - 48px);
