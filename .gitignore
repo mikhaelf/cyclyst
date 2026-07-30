@@ -2,6 +2,7 @@ CLAUDE.local.md
 CLAUDE.md
 saas-migration-plan.md
 THREAT-MODEL.md
+PUBLISHING-CHECKLIST.md
 
 # Python
 .venv/
@@ -17,3 +18,11 @@ Credential Providers/
 
 # personal demo/scratch data
 CE Demo/
+
+# Claude Code local tooling: settings.local.json is per-machine permission state, and
+# worktrees/ holds full ad-hoc repo checkouts from background sessions — neither belongs in
+# version control.
+.claude/
+
+# macOS Finder metadata
+.DS_Store
