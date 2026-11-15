@@ -220,6 +220,7 @@ version control. Backups are just a copy of that one file.
 | `CE_TRACKER_DEMO` | unset | Set to `1` to load fictional sample credentials on startup — **only if the database is empty**. |
 | `CE_TRACKER_DEBUG` | unset | Set to `1` to enable Flask/Werkzeug debug mode (auto-reload plus an interactive in-browser debugger on unhandled exceptions). Local development only — never set this if the app might be reachable from anywhere but your own machine, since the debugger allows arbitrary code execution. |
 | `CE_TRACKER_SECRET_KEY` | auto-generated | Flask's `SECRET_KEY`, used to sign CSRF tokens. Left unset, one is generated on first run and saved to `data/secret_key` (gitignored) so it survives restarts. Set this explicitly only if you need a specific key (e.g. sharing one across multiple processes). |
+| `CE_TRACKER_TRUSTED_HOSTS` | unset | The app only answers requests addressed to `127.0.0.1` or `localhost` (any other hostname gets a 400 Bad Request, which blocks DNS-rebinding attacks from malicious websites). If you deliberately reach it under another name or address (e.g. a LAN hostname), list those here, comma-separated; they are added to the two defaults, never replace them. |
 
 Example — isolated test database with demo data:
 
