@@ -30,3 +30,6 @@ CE Demo/
 
 # macOS Finder metadata
 .DS_Store
+
+# Claude Code security-review reports — local scan output, not for the public repo
+CLAUDE-SECURITY-*/
